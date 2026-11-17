@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Smart Blocus · Portail développeur</title>
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Même univers que l'app : feuille quadrillée, encre bleu nuit, surligneur. Mise en page de console : chiffres d'abord, détails ensuite. */
+:root{
+  --paper:#F4F5EF; --card:#FFFFFF; --ink:#18203A; --mute:#636B84; --line:#D9DCE6; --grid:rgba(24,32,58,.055);
+  --hl:#FFDF3D; --pen:#2B55E0; --good:#16895A; --warn:#C96A10; --bad:#CC3B37; --soft:#EEF0F7;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",sans-serif;
+  --body:"Instrument Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{--paper:#12151F;--card:#1B2030;--ink:#ECEEF6;--mute:#9AA2BC;--line:#31384E;--grid:rgba(236,238,246,.045);--pen:#8AA4FF;--good:#4CC790;--warn:#F0A04B;--bad:#FF7A72;--soft:#242A3D;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--paper);color:var(--ink);font:400 15px/1.45 var(--body);-webkit-font-smoothing:antialiased;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2.5px solid var(--pen);outline-offset:2px;border-radius:6px}
+h1,h2{font-family:var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:26px;font-weight:800}h2{font-size:18px;font-weight:800}
+.hl{background:linear-gradient(transparent 52%,var(--hl) 52%,var(--hl) 92%,transparent 92%);padding:0 3px;color:#18203A}
+@media (prefers-color-scheme:dark){.hl{background:none;color:var(--hl);padding:0}}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 16px 40px;display:flex;flex-direction:column;gap:18px}
+.row{display:flex;align-items:center;gap:10px;min-width:0}.wrapr{flex-wrap:wrap}.grow{flex:1;min-width:0}.between{justify-content:space-between}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 14px;border-radius:9px;font-weight:600;border:1.5px solid var(--ink);background:var(--card);min-height:40px;text-decoration:none;color:var(--ink)}
+.btn.pri{background:var(--ink);color:var(--paper)}.btn.acc{background:var(--hl);color:#18203A;border-color:#18203A}.btn.ghost{border-color:var(--line)}.btn.sm{padding:5px 10px;min-height:32px;font-size:13.5px}.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+input,select,textarea{background:var(--card);border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;min-height:40px;width:100%}
+input:focus,textarea:focus{border-color:var(--pen);outline:none}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--mute)}
+.mute{color:var(--mute)}.small{font-size:13px}.num{font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:4px;border-bottom:1.5px solid var(--ink);overflow-x:auto}
+.tabs button{padding:10px 14px;font-weight:600;color:var(--mute);border-radius:8px 8px 0 0;white-space:nowrap}
+.tabs button[aria-current="true"]{color:var(--ink);background:var(--card);box-shadow:inset 0 -3px 0 var(--hl)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.kpi{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:2px}
+.kpi b{font:800 30px/1.05 var(--display);font-variant-numeric:tabular-nums}.kpi span{font-size:12.5px;color:var(--mute);font-weight:600}
+.kpi.alert{border-color:var(--warn)}.kpi.alert b{color:var(--warn)}
+.chart{display:flex;align-items:flex-end;gap:3px;height:140px;border-bottom:1.5px solid var(--ink);padding-top:16px}
+.chart div{flex:1;background:var(--pen);border-radius:3px 3px 0 0;min-height:2px;position:relative}
+.chart div span{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--mute)}
+.chartx{display:flex;gap:3px;font-size:10px;color:var(--mute)}.chartx span{flex:1;text-align:center}
+.tbl{overflow-x:auto;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:700;background:var(--soft)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-flex;align-items:center;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--soft)}
+.pill.good{color:var(--good)}.pill.warn{color:var(--warn)}
+.fb{border-left:4px solid var(--warn)}.fb.done{border-left-color:var(--line);opacity:.75}
+.stars{color:var(--hl);letter-spacing:1px;-webkit-text-stroke:.5px #18203A}
+.center{min-height:80vh;display:grid;place-items:center}
+.box{width:100%;max-width:400px;display:flex;flex-direction:column;gap:14px}
+.err{color:var(--bad);font-size:13.5px;margin:0}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:9px;overflow:hidden}.seg button{flex:1;padding:7px 10px;font-weight:600;font-size:13.5px}.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SBC=window.SB_CONFIG||{};
+const sb=(SBC.url&&SBC.anonKey&&window.supabase)?window.supabase.createClient(SBC.url,SBC.anonKey,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'smartblocus.auth'}}):null;
+const P={user:null,admin:null,loading:false,err:'',tab:'apercu',stats:null,users:[],fb:[],ann:[],q:'',fbf:'new',checked:false};
+const fmtD=d=>d?new Intl.DateTimeFormat('fr-BE',{day:'numeric',month:'short',year:'numeric'}).format(new Date(d)):'–';
+const fmtDT=d=>d?new Intl.DateTimeFormat('fr-BE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(d)):'jamais';
+const hours=m=>{m=Math.round(+m||0);return m>=60?Math.floor(m/60)+' h '+String(m%60).padStart(2,'0'):m+' min'};
+const ago=d=>{if(!d)return 'jamais';const s=(Date.now()-new Date(d))/1000;return s<3600?'il y a '+Math.max(1,Math.round(s/60))+' min':s<86400?'il y a '+Math.round(s/3600)+' h':s<86400*30?'il y a '+Math.round(s/86400)+' j':fmtD(d)};
+
+function render(){
+  const a=$('#app');
+  if(!SBC.url||!SBC.anonKey){a.innerHTML=`<div class="wrap center"><div class="box card"><h1>Portail <span class="hl">développeur</span></h1><p style="margin:0">Les comptes ne sont pas encore activés. Remplis <b>config.js</b> avec l'adresse et la clé de ton projet Supabase, puis recharge cette page.</p></div></div>`;return}
+  if(!sb){a.innerHTML=`<div class="wrap center"><div class="box card"><h1>Hors ligne</h1><p style="margin:0">Le portail a besoin d'internet.</p></div></div>`;return}
+  if(!P.checked){a.innerHTML=`<div class="wrap center"><p class="mute">Chargement…</p></div>`;return}
+  if(!P.user){a.innerHTML=`<div class="wrap center"><form class="box card" id="login"><h1>Portail <span class="hl">développeur</span></h1><p class="mute small" style="margin:0">Connecte-toi avec ton compte Smart Blocus.</p><label class="f">E-mail<input type="email" id="em" autocomplete="email" required></label><label class="f">Mot de passe<input type="password" id="pw" autocomplete="current-password" required></label>${P.err?`<p class="err">${esc(P.err)}</p>`:''}<button class="btn pri">Se connecter</button></form></div>`;
+    $('#login').addEventListener('submit',login);return}
+  if(P.admin===false){a.innerHTML=`<div class="wrap center"><div class="box card"><h1>Accès réservé</h1><p style="margin:0">Le compte <b>${esc(P.user.email)}</b> n'est pas administrateur.</p><p class="small mute" style="margin:0">Dans Supabase, SQL Editor, lance :<br><code>update public.profiles set is_admin = true where email = '${esc(P.user.email)}';</code><br>puis recharge cette page.</p><button class="btn" data-a="logout">Se déconnecter</button></div></div>`;return}
+  const T=[['apercu','Aperçu'],['users','Utilisateurs'],['avis','Avis'+(P.stats&&P.stats.feedback_new?' ('+P.stats.feedback_new+')':'')],['annonces','Annonces']];
+  let h=`<div class="wrap"><header class="row between wrapr"><div><p class="mute small" style="margin:0">Smart Blocus</p><h1>Portail <span class="hl">développeur</span></h1></div><div class="row wrapr"><span class="small mute">${esc(P.user.email)}</span><button class="btn sm ghost" data-a="reload" ${P.loading?'disabled':''}>${P.loading?'Chargement…':'Actualiser'}</button><a class="btn sm" href="./">Ouvrir l'app</a><button class="btn sm ghost" data-a="logout">Se déconnecter</button></div></header>
+  ${P.err?`<p class="err">${esc(P.err)}</p>`:''}<nav class="tabs">${T.map(t=>`<button data-a="tab" data-t="${t[0]}" aria-current="${P.tab===t[0]}">${t[1]}</button>`).join('')}</nav>`;
+  h+=P.tab==='users'?vUsers():P.tab==='avis'?vFb():P.tab==='annonces'?vAnn():vOverview();
+  a.innerHTML=h+`</div>`;
+}
+function vOverview(){
+  const s=P.stats||{};const days=[];const today=new Date();for(let i=29;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10))}
+  const by={};(s.signups||[]).forEach(x=>by[x.d]=x.n);const vals=days.map(d=>by[d]||0),mx=Math.max(1,...vals);
+  const act=P.users.filter(u=>u.last_seen).slice().sort((a,b)=>new Date(b.last_seen)-new Date(a.last_seen)).slice(0,6);
+  return `<div class="kpis"><div class="kpi"><b>${s.users??'–'}</b><span>utilisateurs</span></div><div class="kpi"><b>${s.new7??'–'}</b><span>nouveaux sur 7 jours</span></div><div class="kpi"><b>${s.active1??'–'}</b><span>actifs aujourd'hui</span></div><div class="kpi"><b>${s.active7??'–'}</b><span>actifs sur 7 jours</span></div><div class="kpi"><b>${s.minutes!=null?Math.round(s.minutes/60):'–'}</b><span>heures étudiées au total</span></div><div class="kpi ${s.feedback_new?'alert':''}"><b>${s.feedback_new??'–'}</b><span>avis à lire</span></div></div>
+  <div class="row wrapr" style="align-items:stretch;gap:18px"><section class="card grow" style="min-width:300px"><h2>Inscriptions, 30 derniers jours</h2><div class="chart" role="img" aria-label="Inscriptions par jour">${vals.map((v,i)=>`<div style="height:${Math.round(v/mx*100)}%" title="${fmtD(days[i])} : ${v}">${v?`<span>${v}</span>`:''}</div>`).join('')}</div><div class="chartx">${days.map((d,i)=>`<span>${i%5?'':+d.slice(8)}</span>`).join('')}</div></section>
+  <section class="card grow" style="min-width:280px"><h2>Dernières visites</h2>${act.length?act.map(u=>`<div class="row between small"><span class="grow" style="overflow:hidden;text-overflow:ellipsis">${esc(u.email)}</span><span class="mute">${ago(u.last_seen)}</span></div>`).join(''):'<p class="mute small" style="margin:0">Personne pour l\'instant.</p>'}</section></div>
+  <section class="card"><div class="row between"><h2>Derniers avis</h2><button class="btn sm ghost" data-a="tab" data-t="avis">Tout voir</button></div>${P.fb.slice(0,3).map(fbCard).join('')||'<p class="mute small" style="margin:0">Aucun avis pour l\'instant. Les utilisateurs peuvent en envoyer depuis Réglages, Donner mon avis.</p>'}</section>`;
+}
+function vUsers(){
+  const q=P.q.toLowerCase(),list=P.users.filter(u=>!q||(u.email||'').toLowerCase().includes(q));
+  return `<div class="row wrapr"><input type="search" id="q" placeholder="Rechercher un e-mail" value="${esc(P.q)}" style="max-width:320px" aria-label="Rechercher"><span class="small mute grow">${list.length} utilisateur${list.length>1?'s':''}</span><button class="btn sm" data-a="csv">Exporter en CSV</button></div>
+  <div class="tbl"><table><thead><tr><th>E-mail</th><th>Inscrit le</th><th>Dernière visite</th><th class="n">Cours</th><th class="n">Sessions</th><th class="n">Temps étudié</th><th></th></tr></thead><tbody>${list.map(u=>`<tr><td>${esc(u.email)}</td><td>${fmtD(u.created_at)}</td><td>${ago(u.last_seen)}</td><td class="n">${u.courses}</td><td class="n">${u.sessions}</td><td class="n">${hours(u.minutes)}</td><td>${u.is_admin?'<span class="pill good">Admin</span>':''}</td></tr>`).join('')||'<tr><td colspan="7" class="mute">Aucun utilisateur.</td></tr>'}</tbody></table></div>`;
+}
+function fbCard(f){return `<div class="card fb ${f.status==='done'?'done':''}" style="padding:12px;gap:6px"><div class="row between wrapr"><span class="row wrapr small"><b>${esc(f.email||'Anonyme')}</b><span class="mute">${fmtDT(f.created_at)}</span>${f.rating?`<span class="stars" aria-label="${f.rating} sur 5">${'★'.repeat(f.rating)}</span>`:''}${f.app_version?`<span class="pill">v${esc(f.app_version)}</span>`:''}</span><span class="row"><button class="btn sm ${f.status==='done'?'ghost':''}" data-a="fbst" data-id="${f.id}">${f.status==='done'?'Rouvrir':'Marquer comme traité'}</button><button class="btn sm danger" data-a="fbdel" data-id="${f.id}" aria-label="Supprimer l'avis">×</button></span></div><p style="margin:0;white-space:pre-wrap">${esc(f.message)}</p></div>`}
+function vFb(){const list=P.fb.filter(f=>P.fbf==='all'||f.status===P.fbf);
+  return `<div class="row wrapr"><div class="seg" style="max-width:360px;flex:1"><button data-a="fbf" data-v="new" aria-pressed="${P.fbf==='new'}">À traiter</button><button data-a="fbf" data-v="done" aria-pressed="${P.fbf==='done'}">Traités</button><button data-a="fbf" data-v="all" aria-pressed="${P.fbf==='all'}">Tous</button></div></div>${list.map(fbCard).join('')||'<p class="mute">Rien ici.</p>'}`}
+function vAnn(){return `<section class="card"><h2>Nouvelle annonce</h2><p class="small mute" style="margin:0">Les annonces actives apparaissent en haut de l'écran Aujourd'hui de chaque utilisateur, qui peut la fermer.</p><form id="annf" class="row" style="align-items:flex-start"><textarea id="ann" rows="2" maxlength="500" placeholder="Ex. Nouveau : les flashcards sont arrivées ! Bon blocus à tous." class="grow"></textarea><button class="btn pri">Publier</button></form></section>
+  ${P.ann.map(n=>`<div class="card" style="padding:12px;gap:6px"><div class="row between wrapr"><span class="row small"><span class="pill ${n.active?'good':''}">${n.active?'Visible':'Masquée'}</span><span class="mute">${fmtDT(n.created_at)}</span></span><span class="row"><button class="btn sm" data-a="annst" data-id="${n.id}">${n.active?'Masquer':'Réafficher'}</button><button class="btn sm danger" data-a="anndel" data-id="${n.id}" aria-label="Supprimer l'annonce">×</button></span></div><p style="margin:0">${esc(n.message)}</p></div>`).join('')||'<p class="mute">Aucune annonce.</p>'}`}
+
+async function login(e){e.preventDefault();P.err='';const {data,error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error){P.err=/invalid login/i.test(error.message)?'E-mail ou mot de passe incorrect.':error.message;render();return}P.user=data.user;await load()}
+async function load(){
+  P.loading=true;P.err='';render();
+  try{
+    const {data:pr}=await sb.from('profiles').select('is_admin').eq('id',P.user.id).maybeSingle();P.admin=!!(pr&&pr.is_admin);
+    if(P.admin){
+      const [st,us,fb,an]=await Promise.all([sb.rpc('admin_stats'),sb.rpc('admin_users'),sb.from('feedback').select('*').order('created_at',{ascending:false}).limit(300),sb.from('announcements').select('*').order('created_at',{ascending:false})]);
+      for(const r of [st,us,fb,an])if(r.error)throw r.error;
+      P.stats=st.data;P.users=us.data||[];P.fb=fb.data||[];P.ann=an.data||[];
+    }
+  }catch(e){P.err='Chargement impossible : '+(e.message||e)+'. As-tu bien lancé setup.sql dans Supabase ?'}
+  P.loading=false;render();
+}
+async function act(promise,okMsg){const {error}=await promise;if(error){P.err=error.message;render();return false}await load();return true}
+document.addEventListener('click',async e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;const a=el.dataset.a,id=+el.dataset.id;
+  if(a==='tab'){P.tab=el.dataset.t;render()}
+  else if(a==='reload')load();
+  else if(a==='logout'){await sb.auth.signOut();P.user=null;P.admin=null;render()}
+  else if(a==='fbf'){P.fbf=el.dataset.v;render()}
+  else if(a==='fbst'){const f=P.fb.find(x=>x.id===id);act(sb.from('feedback').update({status:f.status==='done'?'new':'done'}).eq('id',id))}
+  else if(a==='fbdel'){if(el.dataset.sure){act(sb.from('feedback').delete().eq('id',id))}else{el.dataset.sure='1';el.textContent='Confirmer';setTimeout(()=>{el.dataset.sure='';el.textContent='×'},3000)}}
+  else if(a==='annst'){const n=P.ann.find(x=>x.id===id);act(sb.from('announcements').update({active:!n.active}).eq('id',id))}
+  else if(a==='anndel'){if(el.dataset.sure){act(sb.from('announcements').delete().eq('id',id))}else{el.dataset.sure='1';el.textContent='Confirmer';setTimeout(()=>{el.dataset.sure='';el.textContent='×'},3000)}}
+  else if(a==='csv'){const rows=[['email','inscrit_le','derniere_visite','cours','sessions','minutes','admin'],...P.users.map(u=>[u.email,u.created_at,u.last_seen||'',u.courses,u.sessions,Math.round(u.minutes),u.is_admin])];
+    const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');const url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));const l=document.createElement('a');l.href=url;l.download='smart-blocus-utilisateurs.csv';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+});
+document.addEventListener('input',e=>{if(e.target.id==='q'){P.q=e.target.value;const pos=e.target.selectionStart;render();const q=$('#q');q.focus();q.setSelectionRange(pos,pos)}});
+document.addEventListener('submit',async e=>{if(e.target.id==='annf'){e.preventDefault();const m=$('#ann').value.trim();if(m)await act(sb.from('announcements').insert({message:m.slice(0,500)}))}});
+(async()=>{if(sb){const {data}=await sb.auth.getSession();P.user=data.session?data.session.user:null;P.checked=true;if(P.user)await load();else render()}else render()})();
+render();
+</script>
+</body>
+</html>

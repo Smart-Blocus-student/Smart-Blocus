@@ -98,7 +98,7 @@ nav button[aria-current="page"] span{background:linear-gradient(transparent 50%,
 .chip[aria-pressed="true"]::before{content:"✓";font-weight:700}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--soft);white-space:nowrap}
 .pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
-input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{background:var(--card);border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;min-height:42px;width:100%;min-width:0}
+input[type=text],input[type=number],input[type=date],input[type=time],input[type=email],input[type=password],input[type=url],input[type=search],select,textarea{background:var(--card);border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;min-height:42px;width:100%;min-width:0}
 input:focus,select:focus,textarea:focus{border-color:var(--pen);outline:none}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:13.5px;font-weight:600;color:var(--mute);min-width:0}
 .bar{height:9px;border-radius:99px;background:var(--soft);overflow:hidden}
@@ -186,6 +186,16 @@ label.btn{cursor:pointer;user-select:none;-webkit-user-select:none}
 #viewer{position:fixed;inset:0;z-index:50;background:var(--paper);display:flex;flex-direction:column}
 #viewer header{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1.5px solid var(--ink)}
 #viewer iframe,#viewer img{flex:1;border:0;width:100%;min-height:0;object-fit:contain;background:#fff}
+nav[hidden]{display:none!important}
+.gate{min-height:100%;display:grid;place-items:center;padding:24px 0}
+.gbox{width:100%;max-width:440px;display:flex;flex-direction:column;gap:16px}
+.brand2{font:800 40px/1 var(--display);letter-spacing:-.02em}
+.flash{min-height:220px;border:1.5px solid var(--ink);border-radius:14px;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:22px;text-align:center;width:100%}
+.ftext{font:800 26px/1.2 var(--display);overflow-wrap:anywhere;white-space:pre-wrap}
+.stars{display:flex;gap:4px}.stars button{font-size:28px;line-height:1;color:var(--line);padding:2px}.stars button[aria-pressed="true"]{color:var(--hl);text-shadow:0 0 0 var(--ink)}
+.cardlist{max-height:260px;overflow:auto;border:1.5px solid var(--line);border-radius:10px;padding:4px 10px}
+.cardlist .row{padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.cardlist .row:last-child{border-bottom:0}
+.boxdots{display:inline-flex;gap:2px}.boxdots i{width:6px;height:6px;border-radius:50%;background:var(--line)}.boxdots i.on{background:var(--good)}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .35s ease}}
 </style>
 </head>
@@ -200,6 +210,8 @@ label.btn{cursor:pointer;user-select:none;-webkit-user-select:none}
 <div id="viewer" hidden></div>
 <input type="file" id="dirpick" webkitdirectory multiple class="vh" tabindex="-1" aria-hidden="true">
 <input type="file" id="filepick" multiple class="vh" tabindex="-1" aria-hidden="true">
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
 <script>
 "use strict";
 /* ---------- utilitaires ---------- */
@@ -271,6 +283,7 @@ const LS='smartblocus.v1';
 function fixItem(it,g){it.n=Math.max(1,Math.min(2000,parseInt(it.n)||1));it.s=String(it.s||'').slice(0,it.n).padEnd(it.n,'0');it.mode=it.mode||(g==='p'?'l':'p');it.t=String(it.t||'');return it}
 function fixCourse(c){
   c.color=c.color||COLORS[0];c.exam=c.exam||'';c.items=Array.isArray(c.items)?c.items:[];
+  c.annexes=Array.isArray(c.annexes)?c.annexes:[];c.annexes.forEach(a=>{if(a.type==='deck')a.cards=(Array.isArray(a.cards)?a.cards:[]).map(x=>({id:x.id||uid(),f:String(x.f||''),b:String(x.b||''),box:+x.box||0,due:x.due||''}))});
   if(!Array.isArray(c.sections))c.sections=mkSecs('classique');
   for(const it of c.items)if(!c.sections.some(x=>x.id===it.t)){let x=c.sections.find(y=>y.g==='x')||c.sections[c.sections.length-1];if(!x){x={id:'gen',name:'Contenu',g:'t'};c.sections.push(x)}it.t=x.id}
   c.items.forEach(it=>fixItem(it,gOf(c,it)));return c}
@@ -279,10 +292,15 @@ function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
 function loadLocal(){try{const r=JSON.parse(localStorage.getItem(LS)||'null');if(r&&r.main){S.del=r.del||{};S.main=fixMain(r.main);S.log=r.log&&Array.isArray(r.log.sessions)?r.log:{sessions:[]};S.courses={};for(const k in (r.courses||{}))S.courses[k]=fixCourse(r.courses[k])}}catch(e){}}
 const hasData=()=>Object.keys(S.courses).length>0||S.log.sessions.length>0||S.main.todos.length>0;
 
-/* ---------- synchronisation entre appareils (Gist privé GitHub) ---------- */
-const CFG='smartblocus.sync',GFILE='smart-blocus.json';
-let cfg=null;try{cfg=JSON.parse(localStorage.getItem(CFG)||'null')}catch(e){}
-let syncState=cfg&&cfg.gist?'connecting':'local',pushT=null,busy=false,again=false,needPush=false;
+/* ---------- comptes et synchronisation (Supabase) ---------- */
+const APP_VERSION='3.0';
+const SBC=window.SB_CONFIG||{},ACCT_KEY='smartblocus.acct',sbReady=!!(SBC.url&&SBC.anonKey);
+let sb=null;try{if(sbReady&&window.supabase)sb=window.supabase.createClient(SBC.url,SBC.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'smartblocus.auth'}})}catch(e){sb=null}
+let acct=null;try{acct=JSON.parse(localStorage.getItem(ACCT_KEY)||'null')}catch(e){}
+try{localStorage.removeItem('smartblocus.sync')}catch(e){}
+const saveAcct=()=>{try{acct?localStorage.setItem(ACCT_KEY,JSON.stringify(acct)):localStorage.removeItem(ACCT_KEY)}catch(e){}};
+const signedIn=()=>!!(acct&&acct.id);
+let syncState=signedIn()?'connecting':'local',pushT=null,busy=false,again=false,needPush=false,lastTouch=0,isAdminUser=false,news=[];
 const docData=id=>id==='main'?S.main:id==='log'?S.log:(S.courses[id.slice(2)]||null);
 function setDoc(id,data){
   if(id==='main')S.main=fixMain(data);
@@ -291,56 +309,86 @@ function setDoc(id,data){
 }
 function stamp(...ids){const t=Date.now();S.del=S.del||{};ids.forEach(id=>{const d=docData(id);if(d)d._t=t;else S.del[id]=t});needPush=true}
 function commit(...ids){stamp(...ids);saveLocal();pushSoon();refresh()}
-function pushSoon(ms){if(!cfg||!cfg.gist)return;clearTimeout(pushT);pushT=setTimeout(syncNow,ms||1500)}
-async function gh(path,opt){
-  const r=await fetch('https://api.github.com'+path,Object.assign({headers:{'Authorization':'Bearer '+cfg.token,'Accept':'application/vnd.github+json'},cache:'no-store'},opt||{}));
-  if(!r.ok){const e=new Error('GitHub '+r.status);e.status=r.status;throw e}
-  return r.json();
-}
-async function readRemote(){
-  const g=await gh('/gists/'+cfg.gist),f=g.files&&g.files[GFILE];if(!f)return null;
-  let txt=f.content;if(f.truncated)txt=await (await fetch(f.raw_url,{cache:'no-store'})).text();
-  try{return JSON.parse(txt)}catch(e){return null}
-}
-/* Fusion : pour chaque bloc (réglages, journal, chaque cours), la version modifiée le plus récemment gagne. */
+function pushSoon(ms){if(!signedIn()||!sb)return;clearTimeout(pushT);pushT=setTimeout(syncNow,ms||1500)}
+async function readRemote(){const {data,error}=await sb.from('states').select('data').eq('user_id',acct.id).maybeSingle();if(error)throw error;return data?data.data:null}
+async function writeRemote(){const {error}=await sb.from('states').upsert({user_id:acct.id,data:S,updated_at:new Date().toISOString()});if(error)throw error}
+/* Fusion : pour chaque bloc (réglages, chaque cours), la version modifiée le plus récemment gagne ; les sessions s'additionnent. */
 function mergeRemote(R){
   let changed=false;S.del=S.del||{};
   if(!R||!R.main){needPush=true;return false}
   const rd=R.del||{};for(const id in rd)if(rd[id]>(S.del[id]||0))S.del[id]=rd[id];
   const rc=R.courses||{};
-  const ids=new Set(['main','log',...Object.keys(S.courses).map(k=>'c_'+k),...Object.keys(rc).map(k=>'c_'+k)]);
+  const ids=new Set(['main',...Object.keys(S.courses).map(k=>'c_'+k),...Object.keys(rc).map(k=>'c_'+k)]);
   for(const id of ids){
-    const r=id==='main'?R.main:id==='log'?R.log:rc[id.slice(2)],l=docData(id);
+    const r=id==='main'?R.main:rc[id.slice(2)],l=docData(id);
     const rt=r?r._t||0:-1,lt=l?l._t||0:-1,dt=S.del[id]||0;
     if(id.startsWith('c_')&&dt>Math.max(rt,lt)){if(l){delete S.courses[id.slice(2)];changed=true}if(r)needPush=true;continue}
     if(r&&rt>lt){setDoc(id,clone(r));changed=true}
     else if(l&&lt>rt)needPush=true;
   }
+  const rs=(R.log&&Array.isArray(R.log.sessions))?R.log.sessions:[],ls=S.log.sessions,seen=new Set(ls.map(x=>x.id)),gone=x=>S.del['s_'+x.id];
+  const add=rs.filter(x=>!seen.has(x.id)&&!gone(x)),rm=ls.filter(gone);
+  if(add.length||rm.length){S.log.sessions=ls.filter(x=>!gone(x)).concat(add).sort((a,b)=>(a.at||0)-(b.at||0));changed=true}
+  const rids=new Set(rs.map(x=>x.id));if(S.log.sessions.some(x=>!rids.has(x.id))||rs.some(gone))needPush=true;
   return changed;
 }
 async function syncNow(){
-  if(!cfg||!cfg.gist)return;if(busy){again=true;return}busy=true;const before=syncState;let changed=false;
+  if(!signedIn()||!sb||V.gate)return;if(busy){again=true;return}busy=true;const before=syncState;let changed=false;
   try{
     changed=mergeRemote(await readRemote());if(changed)saveLocal();
-    if(needPush){needPush=false;try{await gh('/gists/'+cfg.gist,{method:'PATCH',body:JSON.stringify({files:{[GFILE]:{content:JSON.stringify(S)}}})})}catch(e){needPush=true;throw e}}
+    if(needPush){needPush=false;try{await writeRemote()}catch(e){needPush=true;throw e}}
     syncState='ok';
-  }catch(e){syncState=(e.status===401||e.status===403||e.status===404)?'error':'stale'}
+    if(Date.now()-lastTouch>10*60000){lastTouch=Date.now();sb.rpc('touch').then(()=>{},()=>{})}
+  }catch(e){const m=String(e&&(e.message||e.code)||'');syncState=/jwt|401|PGRST30/i.test(m)?'error':'stale'}
   finally{busy=false;if(changed||syncState!==before)refresh();if(again){again=false;pushSoon(300)}}
 }
-async function linkSync(token){
-  cfg={token};
-  const list=await gh('/gists?per_page=100');
-  const found=list.find(g=>g.files&&g.files[GFILE]);
-  if(found)cfg.gist=found.id;
-  else{const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Smart Blocus – synchronisation',public:false,files:{[GFILE]:{content:JSON.stringify(S)}}})});cfg.gist=g.id}
-  try{localStorage.setItem(CFG,JSON.stringify(cfg))}catch(e){}
-  syncState='connecting';await syncNow();return !!found;
+const AUTH_ERR=m=>{m=String(m||'');return /invalid login/i.test(m)?'E-mail ou mot de passe incorrect.':/not confirmed/i.test(m)?'Confirme d\'abord ton adresse avec le lien reçu par e-mail.':/already (been )?registered|already exists/i.test(m)?'Un compte existe déjà avec cet e-mail. Connecte-toi.':/at least|password should|weak/i.test(m)?'Le mot de passe doit faire au moins 6 caractères.':/rate|too many|security purposes/i.test(m)?'Trop d\'essais. Réessaie dans quelques minutes.':/fetch|network|load failed/i.test(m)?'Pas de connexion internet.':/email/i.test(m)&&/invalid|valid/i.test(m)?'Cette adresse e-mail n\'est pas valide.':'Erreur : '+m};
+const redirectUrl=()=>location.origin+location.pathname;
+let loginBusy=false;
+async function onLogin(user){
+  if(loginBusy)return;loginBusy=true;
+  try{
+    const prev=acct;
+    if(prev&&prev.id&&prev.id!==user.id){S={main:blankMain(),log:{sessions:[]},courses:{}};saveLocal()}
+    acct={id:user.id,email:user.email};saveAcct();V.gate=false;V.auth=null;T.apw='';T.aerr='';syncState='connecting';refresh();
+    let remote=null;try{remote=await readRemote()}catch(e){}
+    const remoteHas=!!(remote&&remote.main&&(Object.keys(remote.courses||{}).length||((remote.log||{}).sessions||[]).length));
+    if(remoteHas&&hasData()&&!(prev&&prev.id===user.id)){T.remote=remote;openModal(mMergeChoice)}
+    else afterLogin();
+  }finally{loginBusy=false}
+}
+function afterLogin(){syncNow();loadNews();checkAdmin()}
+async function loadNews(){if(!sb||!signedIn())return;try{const {data}=await sb.from('announcements').select('id,message,created_at').eq('active',true).order('created_at',{ascending:false}).limit(3);let dis=[];try{dis=JSON.parse(localStorage.getItem('smartblocus.dismissed')||'[]')}catch(e){}news=(data||[]).filter(n=>!dis.includes(n.id));refresh()}catch(e){}}
+async function checkAdmin(){if(!sb||!signedIn())return;try{const {data}=await sb.from('profiles').select('is_admin').eq('id',acct.id).maybeSingle();const was=isAdminUser;isAdminUser=!!(data&&data.is_admin);if(was!==isAdminUser)refresh()}catch(e){}}
+function bootAuth(){
+  if(!sbReady||(acct&&acct.local)){if(!signedIn())syncState='local';return}
+  if(!signedIn())V.gate=true;
+  if(!sb){if(signedIn())syncState='stale';return}
+  sb.auth.onAuthStateChange((ev,session)=>{
+    if(ev==='PASSWORD_RECOVERY'){T.pwRecovery=true;setTimeout(()=>openModal(mNewPw),0);return}
+    if(ev==='SIGNED_IN'&&session&&(!signedIn()||acct.id!==session.user.id))setTimeout(()=>onLogin(session.user),0);
+    if(ev==='SIGNED_OUT'&&signedIn()&&!T.loggingOut){V.gate=true;syncState='error';setTimeout(refresh,0)}
+  });
+  sb.auth.getSession().then(({data})=>{
+    const ss=data&&data.session;
+    if(ss){if(!signedIn()||acct.id!==ss.user.id)onLogin(ss.user);else afterLogin()}
+    else if(signedIn()){V.gate=true;refresh()}
+  },()=>{});
+}
+async function doLogout(){
+  T.loggingOut=true;try{if(sb)await sb.auth.signOut()}catch(e){}T.loggingOut=false;
+  acct=null;saveAcct();S={main:blankMain(),log:{sessions:[]},courses:{}};try{localStorage.removeItem(LS)}catch(e){}
+  try{indexedDB.deleteDatabase('smartblocus-files')}catch(e){}IDB.db=null;
+  isAdminUser=false;news=[];syncState='local';V={tab:'aujourdhui',course:null,gate:sbReady};M=null;refresh();
 }
 
 /* ---------- calculs ---------- */
 const courses=()=>Object.values(S.courses).sort((a,b)=>(a.exam||'9999').localeCompare(b.exam||'9999')||natural(a.name,b.name));
 const itemProg=it=>{let a=0;for(const ch of it.s)a+=ch==='2'?1:ch==='1'?.5:0;return a/it.n};
-function cProg(c,grp){const its=c.items.filter(i=>!i.skip&&gOf(c,i)!=='x'&&(!grp||gOf(c,i)===grp));if(!its.length)return null;return its.reduce((a,i)=>a+itemProg(i),0)/its.length}
+const LEIT=[0,1,2,4,7,15,30];
+const deckDue=a=>(a.cards||[]).filter(x=>!x.due||x.due<=TODAY());
+const deckProg=a=>{const n=(a.cards||[]).length;return n?a.cards.filter(x=>x.box>=3).length/n:0};
+function cProg(c,grp){const v=c.items.filter(i=>!i.skip&&gOf(c,i)!=='x'&&(!grp||gOf(c,i)===grp)).map(itemProg);if(!grp||grp==='p')(c.annexes||[]).forEach(a=>{if(a.type==='deck'&&a.cards.length)v.push(deckProg(a))});if(!v.length)return null;return v.reduce((a,b)=>a+b,0)/v.length}
 function remFrac(c,grp){let r=0;for(const it of c.items){if(it.skip||gOf(c,it)!==grp)continue;let z=0;for(const ch of it.s)if(ch==='0')z++;r+=z/it.n}return r}
 const sortedItems=c=>{const ix=id=>c.sections.findIndex(x=>x.id===id);return c.items.slice().sort((a,b)=>ix(a.t)-ix(b.t)||natural(a.name,b.name))};
 function studyDaysLeft(c,date){
@@ -425,7 +473,7 @@ function autofill(){
 /* ---------- rendu ---------- */
 function ring(p,size,sw,label,color){const r=(size-sw)/2,c=2*Math.PI*r,h=size/2;return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${esc(label)}" style="flex:none"><circle cx="${h}" cy="${h}" r="${r}" fill="none" stroke="var(--soft)" stroke-width="${sw}"/><circle cx="${h}" cy="${h}" r="${r}" fill="none" stroke="${color||'var(--pen)'}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-Math.max(0,Math.min(1,p||0)))}" transform="rotate(-90 ${h} ${h})"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" class="ringt" style="font-size:${size>70?17:13}px">${esc(label)}</text></svg>`}
 const bar=(p,color)=>`<div class="bar" style="--cc:${color||'var(--pen)'}"><i style="width:${Math.round((p||0)*100)}%"></i></div>`;
-const syncPill=()=>syncState==='ok'?'<span class="sync ok"><i></i>Synchronisé</span>':syncState==='connecting'?'<span class="sync"><i></i>Synchronisation…</span>':syncState==='stale'?'<span class="sync local"><i></i>Hors ligne, synchro à la reconnexion</span>':syncState==='error'?'<button class="sync err" data-a="tab" data-t="reglages"><i></i>Synchronisation à reconnecter</button>':'<button class="sync local" data-a="tab" data-t="reglages"><i></i>Sur cet appareil seulement</button>';
+const syncPill=()=>syncState==='ok'?'<span class="sync ok"><i></i>Synchronisé</span>':syncState==='connecting'?'<span class="sync"><i></i>Synchronisation…</span>':syncState==='stale'?'<span class="sync local"><i></i>Hors ligne, synchro à la reconnexion</span>':syncState==='error'?'<button class="sync err" data-a="gotoauth"><i></i>Reconnecte-toi</button>':'<button class="sync local" data-a="tab" data-t="reglages"><i></i>Sans compte</button>';
 const TABS=[['aujourdhui','Aujourd\'hui',I.today],['cours','Cours',I.book],['planning','Planning',I.cal],['progres','Progrès',I.chart],['reglages','Réglages',I.gear]];
 function renderNav(){$('#nav').innerHTML='<div class="brand">Smart <span class="hl">Blocus</span></div>'+TABS.map(t=>`<button data-a="tab" data-t="${t[0]}" ${V.tab===t[0]?'aria-current="page"':''}>${t[2]}<span>${t[1]}</span></button>`).join('')}
 
@@ -440,12 +488,53 @@ function taskRows(c){
       if(t.kind==='new')h+=`<button class="qb re" data-a="mark" data-c="${c.id}" data-i="${t.it.id}" data-p="${t.parts.join(',')}" data-v="1"${k} aria-label="Fait, à revoir" title="Fait, à revoir">${I.redo}</button>`}
     h+='</div>';
   }
-  if(d.manual){if(!d.tasks.length)h+=`<p class="mute small" style="margin:0">Ton programme est vide.</p>`;else if(!d.hasNew)h+=`<span class="pill good">Ton programme du jour est terminé</span>`;return h}
+  let decks=0;for(const a of (c.annexes||[]))if(a.type==='deck'){const n=deckDue(a).length;if(n){decks++;h+=`<div class="task new"><button class="tmain" data-a="study" data-c="${c.id}" data-k="${a.id}"><span class="tname">${esc(a.title)}</span><span class="tlab">Flashcards · ${n} carte${n>1?'s':''} à revoir</span></button><button class="qb ok" data-a="study" data-c="${c.id}" data-k="${a.id}" aria-label="Réviser" title="Réviser">${I.play}</button></div>`}}
+  if(d.manual){if(!d.tasks.length&&!decks)h+=`<p class="mute small" style="margin:0">Ton programme est vide.</p>`;else if(!d.hasNew)h+=`<span class="pill good">Ton programme du jour est terminé</span>`;return h}
   if(!c.items.filter(i=>!i.skip&&gOf(c,i)!=='x').length)h+=`<p class="mute small" style="margin:0">Ce cours n'a pas encore de contenu. Ouvre-le dans Cours pour ajouter des fichiers.</p>`;
   else if(!d.hasNew&&d.left>1e-6)h+=`<div class="row wrapr between"><span class="pill good">Objectif du jour atteint</span><button class="btn sm" data-a="more" data-c="${c.id}">J'avance vite, donne-moi la suite</button></div>`;
   else if(!d.tasks.length)h+=`<span class="pill good">Tout est maîtrisé dans ce cours</span>`;
   return h;
 }
+const AXL={quizlet:'Quizlet',deck:'Flashcards',link:'Lien',video:'Vidéo'};
+const QZ_MODES=[['flashcards','Cartes'],['learn','Apprendre'],['test','Test'],['match','Associer'],['spell','Orthographe']];
+const qzId=u=>{const m=String(u).match(/quizlet\.com\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(\d{3,})/i);return m?m[1]:null};
+const ytId=u=>{const m=String(u).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/);return m?m[1]:null};
+const okUrl=u=>/^https?:\/\/[^\s]+$/i.test(String(u||'').trim());
+const hostOf=u=>{try{return new URL(u).hostname.replace(/^www\./,'')}catch(e){return u}};
+function annexRow(c,a){
+  const sub=a.type==='deck'?`${a.cards.length} carte${a.cards.length>1?'s':''} · ${pct(deckProg(a))} maîtrisées${deckDue(a).length?' · '+deckDue(a).length+' à revoir':''}`:a.type==='link'?esc(hostOf(a.url)):a.type==='video'?'YouTube':'Set Quizlet';
+  const inner=`<span class="nm"><b>${esc(a.title)}</b><br><span class="small mute">${AXL[a.type]} · ${sub}</span></span>`;
+  const open=a.type==='link'?`<a class="item" href="${esc(a.url)}" target="_blank" rel="noopener" style="flex:1;color:inherit;text-decoration:none">${inner}<span class="small">Ouvrir ↗</span></a>`:`<button class="item" style="flex:1" data-a="annexopen" data-c="${c.id}" data-k="${a.id}">${inner}${a.type==='deck'?`<span class="mini">${bar(deckProg(a),c.color)}</span>`:''}<span class="small">Ouvrir</span></button>`;
+  return `<div class="row" style="gap:6px">${open}<button class="x" data-a="annexdel" data-c="${c.id}" data-k="${a.id}" aria-label="Supprimer l'annexe">×</button></div>`;
+}
+function parseCards(txt){const out=[];for(let line of String(txt).split(/\r?\n/)){line=line.trim();if(!line)continue;let i=line.indexOf('\t'),L=1;if(i<0){for(const sep of [' - ',' – ',' — ',' ; ',';',' : ',' = ']){i=line.indexOf(sep);if(i>0){L=sep.length;break}}}if(i<=0)continue;const f=line.slice(0,i).trim(),b=line.slice(i+L).trim();if(f&&b)out.push({id:uid(),f:f.slice(0,500),b:b.slice(0,1000),box:0,due:''})}return out}
+const findAnnex=(cid,k)=>{const c=S.courses[cid];return c?(c.annexes||[]).find(a=>a.id===k):null};
+function showViewer(title,body,extra){const v=$('#viewer');v.innerHTML=`<header><b class="grow" style="overflow-wrap:anywhere">${esc(title)}</b>${extra||''}<button class="btn sm pri" data-a="closeviewer">Fermer</button></header>${body}`;v.hidden=false}
+function openQuizlet(c,a){const q=qzId(a.url),md=a.mode||'flashcards';showViewer(a.title,`<iframe src="https://quizlet.com/${q}/${md}/embed" title="${esc(a.title)}" allow="fullscreen"></iframe>`,`<select data-ch="qzmode" data-c="${c.id}" data-k="${a.id}" aria-label="Mode Quizlet" style="width:auto;min-height:34px;padding:4px 8px">${QZ_MODES.map(x=>`<option value="${x[0]}" ${x[0]===md?'selected':''}>${x[1]}</option>`).join('')}</select><a class="btn sm ghost" href="https://quizlet.com/${q}" target="_blank" rel="noopener">Ouvrir sur Quizlet</a>`)}
+function mAnnex(){const x=T.ax,t=x.type;
+  let h=`<h2>Ajouter une annexe</h2><div class="seg">${Object.keys(AXL).map(k=>`<button type="button" data-a="axtype" data-t="${k}" aria-pressed="${t===k}">${AXL[k]}</button>`).join('')}</div><form data-f="annex" style="display:flex;flex-direction:column;gap:12px">`;
+  if(t==='quizlet')h+=`<label class="f">Lien du set Quizlet<input type="url" id="ax-url" value="${esc(x.url||'')}" data-tmp2="url" placeholder="https://quizlet.com/fr/123456789/…" autocomplete="off"></label><label class="f">Mode par défaut<select id="ax-mode" data-tmp2="mode">${QZ_MODES.map(m=>`<option value="${m[0]}" ${m[0]===(x.mode||'flashcards')?'selected':''}>${m[1]}</option>`).join('')}</select></label><p class="small mute" style="margin:0">Le set doit être public. Dans Quizlet : Partager, puis Copier le lien. Tes scores Quizlet ne remontent pas dans l'app.</p>`;
+  else if(t==='deck')h+=`<label class="f">Tes cartes, une par ligne<textarea id="ax-txt" rows="7" data-tmp2="txt" placeholder="apple	pomme&#10;to borrow - emprunter&#10;to lend ; prêter">${esc(x.txt||'')}</textarea></label><p class="small mute" style="margin:0" id="ax-count">${parseCards(x.txt||'').length} carte(s) reconnue(s). Depuis Quizlet : ouvre ton set, ⋯, Exporter, puis Copier le texte. Aussi accepté : « terme - définition » ou « terme ; définition ». Les exports Anki en texte marchent aussi.</p>`;
+  else if(t==='video')h+=`<label class="f">Lien de la vidéo YouTube<input type="url" id="ax-url" value="${esc(x.url||'')}" data-tmp2="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"></label>`;
+  else h+=`<label class="f">Adresse du site<input type="url" id="ax-url" value="${esc(x.url||'')}" data-tmp2="url" placeholder="https://…" autocomplete="off"></label><p class="small mute" style="margin:0">Moodle, Teams, Google Drive, un podcast, un dictionnaire en ligne…</p>`;
+  return h+`<label class="f">Titre${t==='deck'?'':' (facultatif)'}<input type="text" id="ax-title" value="${esc(x.title||'')}" data-tmp2="title" placeholder="${t==='deck'?'Ex. Unit 3 – Vocabulaire':'Ex. Révision chapitre 2'}" autocomplete="off"></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Ajouter</button></div></form>`}
+function mDeck(){const c=S.courses[T.dk.c],a=c&&c.annexes.find(x=>x.id===T.dk.k);if(!a)return '<p style="margin:0">Paquet introuvable.</p><button class="btn" data-a="close">Fermer</button>';
+  const due=deckDue(a).length,ms=a.cards.filter(x=>x.box>=3).length,v=T.dk.view;
+  let h=`<p class="small mute" style="margin:0">${esc(c.name)} · Flashcards</p><h2>${esc(a.title)}</h2><div class="stats"><div class="stat"><b class="num">${a.cards.length}</b><span>cartes</span></div><div class="stat"><b class="num">${ms}</b><span>maîtrisées</span></div><div class="stat"><b class="num">${due}</b><span>à revoir</span></div></div>
+  <div class="row wrapr"><button class="btn acc grow" data-a="study" data-c="${c.id}" data-k="${a.id}" ${due?'':'disabled'}>Réviser (${due})</button><button class="btn" data-a="study" data-c="${c.id}" data-k="${a.id}" data-all="1" ${a.cards.length?'':'disabled'}>Tout réviser</button></div>
+  <label class="row small" style="font-weight:600"><input type="checkbox" data-ch="dkrev" data-c="${c.id}" data-k="${a.id}" ${a.rev?'checked':''} style="width:20px;height:20px;min-height:0;accent-color:var(--ink)">Afficher la définition en premier</label>
+  <div class="row wrapr"><button class="btn sm ${v==='add'?'pri':'ghost'}" data-a="dkview" data-v="add">${I.plus}Ajouter des cartes</button><button class="btn sm ${v==='list'?'pri':'ghost'}" data-a="dkview" data-v="list">Voir les cartes</button></div>`;
+  if(v==='add')h+=`<form data-f="dkadd" style="display:flex;flex-direction:column;gap:8px"><textarea id="dk-add" rows="5" placeholder="terme	définition (une carte par ligne)"></textarea><button class="btn pri" style="align-self:flex-start">Ajouter ces cartes</button></form>`;
+  if(v==='list')h+=`<div class="cardlist">${a.cards.slice(0,400).map(x=>`<div class="row"><span class="grow"><b>${esc(x.f)}</b> · ${esc(x.b)}</span><span class="boxdots" title="Niveau ${x.box}">${[1,2,3,4,5].map(i=>`<i class="${x.box>=i?'on':''}"></i>`).join('')}</span><button class="x" data-a="dkdel" data-id="${x.id}" aria-label="Supprimer la carte">×</button></div>`).join('')||'<p class="small mute">Aucune carte.</p>'}</div>`;
+  return h+`<div class="row"><button class="btn danger sm" data-a="annexdel" data-c="${c.id}" data-k="${a.id}">Supprimer le paquet</button><button class="btn pri grow" data-a="close">Fermer</button></div>`}
+function mStudy(){const st=T.st,c=S.courses[st.c],a=c&&c.annexes.find(x=>x.id===st.k);if(!a)return '<button class="btn" data-a="close">Fermer</button>';
+  const id=st.q[0],x=id&&a.cards.find(y=>y.id===id);
+  if(!x)return `<h2>Session terminée</h2><p style="margin:0">${st.n} carte${st.n>1?'s':''} révisée${st.n>1?'s':''}, dont ${st.ok} sue${st.ok>1?'s':''} du premier coup.</p><p class="small mute" style="margin:0">Les cartes ratées reviendront plus vite, les autres s'espacent.</p><button class="btn pri" data-a="close">Fermer</button>`;
+  const fr=a.rev?x.b:x.f,bk=a.rev?x.f:x.b;
+  return `<div class="row between"><span class="small mute">${esc(a.title)}</span><span class="pill num">${st.q.length} restante${st.q.length>1?'s':''}</span></div>
+  <button class="flash" data-a="flip"><span class="small mute">${st.flip?'Réponse':'Question'}</span><span class="ftext">${esc(st.flip?bk:fr)}</span><span class="small mute">${st.flip?esc(fr):'Touche pour retourner (ou barre d\'espace)'}</span></button>
+  ${st.flip?`<div class="row"><button class="btn grow" data-a="grade" data-g="0" style="border-color:var(--bad);color:var(--bad)">Je ne savais pas</button><button class="btn grow" data-a="grade" data-g="1">Difficile</button><button class="btn grow" data-a="grade" data-g="2" style="border-color:var(--good);color:var(--good)">Je savais</button></div>`:`<button class="btn pri" data-a="flip">Retourner</button>`}
+  <button class="btn ghost sm" data-a="close" style="align-self:center">Arrêter</button>`}
 const dirBtn=(cls,txt,cid)=>`<label for="dirpick" class="${cls}" data-a="pickdir"${cid?` data-c="${cid}"`:''} role="button" tabindex="0">${I.folder}${txt}</label>`;
 const fileBtn=(cid,sid,cls,txt)=>`<label for="filepick" class="${cls}" data-a="pickfiles" data-c="${cid}" data-s="${sid}" role="button" tabindex="0">${I.plus}${txt}</label>`;
 function timerCard(){
@@ -466,6 +555,7 @@ function viewToday(){
   const t=TODAY(),ids=(S.main.plan[t]||[]).filter(id=>S.courses[id]),goal=isOff(t)?0:goalMin(),mt=minToday(),pts=points(),sl=slotsToday(),nm=nowMin();
   const day=S.main.days[t]||{};
   let h=`<div class="wrap"><header class="row between wrapr"><div><p class="mute small" style="margin:0 0 2px">${cap(fmtDay(t))}</p><h1>Ton <span class="hl">blocus</span> du jour</h1></div>${syncPill()}</header>`;
+  for(const n of news)h+=`<div class="banner" style="border-style:solid;border-color:var(--pen)"><span class="grow">${esc(n.message)}</span><button class="btn sm" data-a="dismissnews" data-id="${n.id}">OK</button></div>`;
   if(Object.values(S.courses).some(c=>c.demo))h+=`<div class="banner"><span class="grow">Tu regardes des <b>données d'exemple</b>. Importe tes dossiers pour commencer pour de vrai.</span><button class="btn sm" data-a="cleardemo">Effacer l'exemple</button></div>`;
   if(!Object.keys(S.courses).length){
     return h+`<section class="card"><h2>Commence par tes cours</h2><p style="margin:0">Sur ton Mac, choisis ou glisse sur cette fenêtre le dossier qui contient tes cours. Chaque sous-dossier d'un cours devient une section : <b>Synthèse</b>, <b>Slides</b>, <b>Exercices</b>, ou pour une langue <b>Vocabulaire</b>, <b>Grammaire</b>… Tu vérifies tout avant l'import.</p>
@@ -512,6 +602,7 @@ function viewCourse(c){
     h+=its.length?its.map(it=>`<button class="item ${it.skip?'skip':''}" data-a="item" data-c="${c.id}" data-i="${it.id}"><span class="nm">${esc(it.name)}<br><span class="small mute">${it.skip||sec.g==='x'?'Ne compte pas':it.n>1?(it.mode==='l'?it.n+' éléments numérotés':it.n+' pages'):(it.mode==='l'?'<span style="color:var(--warn)">Touche pour indiquer le nombre d\'éléments</span>':'1 bloc')}</span></span><span class="mini">${it.skip?'':bar(itemProg(it),c.color)}</span><span class="small num" style="width:44px;text-align:right">${it.skip?'–':pct(itemProg(it))}</span></button>`).join(''):`<p class="mute small" style="margin:0">Aucun fichier.</p>`;
     h+=`</div></section>`;
   }
+  h+=`<section class="card flat"><div class="row between wrapr"><div class="row grow" style="min-width:150px;flex-wrap:wrap"><h2>Annexes</h2><span class="pill">Quizlet, flashcards, vidéos, liens</span></div><button class="btn sm" data-a="annexadd" data-c="${c.id}">${I.plus}Ajouter</button></div><div>${(c.annexes||[]).length?c.annexes.map(a=>annexRow(c,a)).join(''):'<p class="mute small" style="margin:0">Ajoute un set Quizlet, des flashcards, une vidéo YouTube ou un lien utile (Moodle, Teams, Drive…).</p>'}</div></section>`;
   return h+`<div class="row wrapr between"><button class="btn sm" data-a="secedit" data-c="${c.id}">${I.plus}Ajouter une section</button><button class="btn danger sm" data-a="delcourse" data-c="${c.id}">Supprimer ce cours</button></div></div>`;
 }
 function viewPlan(){
@@ -552,15 +643,27 @@ function viewSettings(){
   <section class="card flat"><h2>Pauses</h2><label class="f">Me proposer une pause après<select id="st-focus" data-ch="focus">${[[0,'Jamais'],[25,'25 min de travail'],[45,'45 min de travail'],[50,'50 min de travail'],[60,'1 h de travail'],[90,'1 h 30 de travail']].map(x=>`<option value="${x[0]}" ${(+S.main.focus||0)===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select></label></section>
   <section class="card flat"><h2>Jours de repos</h2><div class="row wrapr">${[1,2,3,4,5,6,0].map(d=>`<button class="chip" data-a="off" data-d="${d}" aria-pressed="${S.main.off.includes(d)}">${wd[d]}</button>`).join('')}</div></section></div>
   <div class="col"><section class="card flat"><h2>Mes dossiers de cours</h2><p class="small" style="margin:0">Depuis ton Mac, choisis ou glisse sur cette fenêtre le dossier qui contient tes cours (ou un seul cours). Chaque sous-dossier devient une section : Synthèse, Slides, Exercices, mais aussi Vocabulaire, Grammaire… Relance l'import quand tu ajoutes des fichiers : ta progression est conservée.</p><div class="row wrapr">${dirBtn('btn acc','Importer mes dossiers')}</div><p class="small mute" style="margin:0">Les documents sont gardés sur cet appareil pour les ouvrir depuis l'app. Seuls leurs noms et leur nombre de pages sont synchronisés.</p></section>
-  <section class="card ${cfg&&cfg.gist?'flat':''}"><h2>Synchronisation entre appareils</h2>${cfg&&cfg.gist?`<p class="small" style="margin:0">${syncState==='error'?'<b style="color:var(--bad)">Le jeton n\'est plus accepté.</b> Déconnecte puis colle un nouveau jeton.':'Cet appareil est relié. Tes cours, ton planning et tes sessions se retrouvent sur tous tes appareils reliés.'}</p><div class="row wrapr"><button class="btn sm" data-a="syncnow">Synchroniser maintenant</button><button class="btn sm ghost" data-a="syncoff">Déconnecter cet appareil</button></div>`:`<p class="small" style="margin:0">À faire une seule fois par appareil :</p><ol class="small" style="margin:0;padding-left:20px"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=Smart%20Blocus" target="_blank" rel="noopener">Crée un jeton GitHub</a> (case <b>gist</b> cochée, expiration : aucune).</li><li>Colle-le ici, sur chacun de tes appareils.</li></ol><form class="row" data-f="synclink"><input type="text" id="sy-token" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Jeton GitHub"><button class="btn pri">Relier</button></form><p class="small mute" style="margin:0">Tes données sont rangées dans un Gist privé de ton compte GitHub. Le jeton reste sur cet appareil.</p>`}</section>
+  <section class="card ${signedIn()?'flat':''}"><h2>Mon compte</h2>${!sbReady?`<p class="small mute" style="margin:0">Les comptes ne sont pas encore activés : remplis le fichier config.js (voir le guide).</p>`:signedIn()?`<p class="small" style="margin:0">Connecté en tant que <b>${esc(acct.email||'')}</b>. Tes données sont synchronisées sur tous les appareils où tu te connectes.</p><div class="row wrapr"><button class="btn sm" data-a="syncnow">Synchroniser maintenant</button><button class="btn sm" data-a="chpw">Changer le mot de passe</button><button class="btn sm ghost" data-a="logout">Se déconnecter</button></div>${isAdminUser?`<a class="btn sm acc" href="admin.html" style="align-self:flex-start">Portail développeur</a>`:''}<button class="btn sm danger" data-a="delacct" style="align-self:flex-start">Supprimer mon compte</button>`:`<p class="small" style="margin:0">Tu utilises l'app sans compte : tes données restent sur cet appareil.</p><button class="btn sm acc" data-a="gotoauth" style="align-self:flex-start">Créer un compte ou me connecter</button>`}</section>
+  <section class="card flat"><h2>Ton avis</h2><p class="small mute" style="margin:0">Une idée, un bug, une fonction qui manque ? Dis-le, ça aide à améliorer l'app.</p><button class="btn sm" data-a="feedback" style="align-self:flex-start">Donner mon avis</button></section>
   <section class="card flat"><h2>Sauvegarde</h2><p class="small mute" style="margin:0">Une copie de secours à coller dans une note.</p><div class="row wrapr"><button class="btn sm" data-a="backup">Copier une sauvegarde</button><button class="btn sm" data-a="restore">Restaurer</button><button class="btn sm danger" data-a="reset">Tout effacer</button></div></section></div></div></div>`;
 }
-function render(){renderNav();const v=$('#view');v.innerHTML=V.tab==='cours'?viewCourses():V.tab==='planning'?viewPlan():V.tab==='progres'?viewProgress():V.tab==='reglages'?viewSettings():viewToday()}
+function viewGate(){
+  const m=V.auth||'login';let h=`<div class="gate"><div class="gbox"><div class="brand2">Smart <span class="hl">Blocus</span></div><p class="mute" style="margin:0">Ton blocus organisé : programme du jour, progression par cours, chrono et récompenses. Sur ton Mac, ton iPad et ton iPhone.</p>`;
+  if(m==='sent')h+=`<section class="card"><h2>Vérifie tes e-mails</h2><p style="margin:0">Un lien a été envoyé à <b>${esc(T.aemail||'')}</b>. Clique dessus, puis reviens ici pour te connecter.</p><p class="small mute" style="margin:0">Pas reçu ? Regarde dans les spams.</p><button class="btn pri" data-a="authmode" data-m="login">J'ai confirmé, me connecter</button></section>`;
+  else if(m==='reset'||m==='resetsent')h+=`<section class="card"><h2>Mot de passe oublié</h2>${m==='resetsent'?`<p style="margin:0">Si un compte existe pour <b>${esc(T.aemail||'')}</b>, un lien pour choisir un nouveau mot de passe vient d'être envoyé.</p>`:`<form data-f="reset" style="display:flex;flex-direction:column;gap:12px"><label class="f">E-mail<input type="email" id="au-email" autocomplete="email" required value="${esc(T.aemail||'')}" data-tmp="aemail"></label>${T.aerr?`<p class="small" style="margin:0;color:var(--bad)">${esc(T.aerr)}</p>`:''}<button class="btn acc" ${T.abusy?'disabled':''}>${T.abusy?'Un instant…':'Recevoir un lien'}</button></form>`}<button class="btn ghost sm" data-a="authmode" data-m="login" style="align-self:flex-start">${I.back}Retour à la connexion</button></section>`;
+  else h+=`<section class="card"><div class="seg"><button data-a="authmode" data-m="login" aria-pressed="${m==='login'}">Se connecter</button><button data-a="authmode" data-m="signup" aria-pressed="${m==='signup'}">Créer un compte</button></div>
+    <form data-f="auth" style="display:flex;flex-direction:column;gap:12px"><label class="f">E-mail<input type="email" id="au-email" autocomplete="email" required value="${esc(T.aemail||'')}" data-tmp="aemail"></label><label class="f">Mot de passe${m==='signup'?' (6 caractères minimum)':''}<input type="password" id="au-pw" autocomplete="${m==='signup'?'new-password':'current-password'}" required minlength="6" value="${esc(T.apw||'')}" data-tmp="apw"></label>
+    ${T.aerr?`<p class="small" style="margin:0;color:var(--bad)">${esc(T.aerr)}</p>`:''}<button class="btn acc" ${T.abusy?'disabled':''}>${T.abusy?'Un instant…':m==='signup'?'Créer mon compte':'Me connecter'}</button></form>
+    ${m==='login'?'<button class="btn ghost sm" data-a="authmode" data-m="reset" style="align-self:flex-start">Mot de passe oublié ?</button>':'<p class="small mute" style="margin:0">Tes données sont enregistrées dans ton compte pour les retrouver sur tous tes appareils. Tu peux supprimer ton compte à tout moment.</p>'}</section>`;
+  if(!sb)h+=`<p class="small" style="margin:0;color:var(--bad)">Le serveur ne répond pas. Vérifie ta connexion internet.</p>`;
+  return h+`<button class="btn ghost sm" data-a="localmode" style="align-self:center">Continuer sans compte</button></div></div>`;
+}
+function render(){$('#nav').hidden=!!V.gate;if(V.gate){$('#view').innerHTML=viewGate();return}renderNav();const v=$('#view');v.innerHTML=V.tab==='cours'?viewCourses():V.tab==='planning'?viewPlan():V.tab==='progres'?viewProgress():V.tab==='reglages'?viewSettings():viewToday()}
 function refresh(){
   ensureDay();render();
   if(M){const sh=$('#modal .sheet'),st=sh?sh.scrollTop:0;$('#modal').innerHTML=`<div class="scrim" data-a="close"></div><div class="sheet" role="dialog" aria-modal="true">${M.fn()}</div>`;$('#modal').hidden=false;const s2=$('#modal .sheet');if(s2)s2.scrollTop=st}
   else{$('#modal').hidden=true;$('#modal').innerHTML='';
-    if(syncState!=='connecting'&&!ckSkipped&&Object.keys(S.courses).length&&!(S.main.days[TODAY()]||{}).ck&&!Object.values(S.courses).every(c=>c.demo))A.checkin()}
+    if(!V.gate&&syncState!=='connecting'&&!ckSkipped&&Object.keys(S.courses).length&&!(S.main.days[TODAY()]||{}).ck&&!Object.values(S.courses).every(c=>c.demo))A.checkin()}
 }
 function openModal(fn){M={fn};refresh()}
 function closeModal(){M=null;refresh()}
@@ -632,13 +735,16 @@ function mPick(){
   <div class="row wrapr"><button class="btn ghost" data-a="pkauto">Programme automatique</button><button class="btn pri grow" data-a="pkok">Valider mon programme</button></div>`;
   return h;
 }
+function mMergeChoice(){return `<h2>Ton compte contient déjà des données</h2><p style="margin:0">Cet appareil a aussi des cours et des sessions. Que veux-tu faire ?</p><button class="btn acc" data-a="mergekeep">Utiliser seulement les données du compte</button><button class="btn" data-a="mergeall">Fusionner avec les données de cet appareil</button><p class="small mute" style="margin:0">Si tu as déjà importé les mêmes cours sur tes deux appareils, choisis la première option pour éviter les doublons.</p>`}
+function mNewPw(){return `<h2>${T.pwRecovery?'Choisis un nouveau mot de passe':'Changer le mot de passe'}</h2><form data-f="newpw" style="display:flex;flex-direction:column;gap:12px"><label class="f">Nouveau mot de passe<input type="password" id="np-1" autocomplete="new-password" minlength="6" required></label><label class="f">Confirme-le<input type="password" id="np-2" autocomplete="new-password" minlength="6" required></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Enregistrer</button></div></form>`}
+function mFeedback(){return `<h2>Ton avis</h2><div class="stars" role="group" aria-label="Note">${[1,2,3,4,5].map(r=>`<button type="button" data-a="star" data-r="${r}" aria-pressed="${T.fb.r>=r}" aria-label="${r} sur 5">★</button>`).join('')}</div><form data-f="fb" style="display:flex;flex-direction:column;gap:12px"><label class="f">Ton message<textarea id="fb-msg" rows="5" maxlength="2000" placeholder="Ce qui te plaît, ce qui manque, un bug…" data-tmp="fbmsg">${esc(T.fbmsg||'')}</textarea></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Envoyer</button></div></form>`}
 function mRestore(){return `<h2>Restaurer une sauvegarde</h2><p class="small mute" style="margin:0">Colle ici le texte copié avec « Copier une sauvegarde ». Il remplace toutes les données actuelles.</p><textarea id="rs-text" rows="6" aria-label="Sauvegarde"></textarea><div class="row"><button class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow" data-a="dorestore">Restaurer</button></div>`}
 
 /* ---------- actions ---------- */
 const curItem=()=>{const c=S.courses[T.ic];return c&&c.items.find(i=>i.id===T.ii)};
 const dayOf=()=>S.main.days[TODAY()]=S.main.days[TODAY()]||{};
 function setParts(c,it,parts,v){const a=[...it.s];parts.forEach(p=>{if(p>=1&&p<=it.n)a[p-1]=v});it.s=a.join('')}
-function newCourse(name,exam,demo,tpl){const id=uid(),n=Object.keys(S.courses).length;S.courses[id]={id,name,exam:exam||'',color:COLORS[n%COLORS.length],tpl:tpl||'classique',sections:mkSecs(tpl),items:[]};if(demo)S.courses[id].demo=1;return S.courses[id]}
+function newCourse(name,exam,demo,tpl){const id=uid(),n=Object.keys(S.courses).length;S.courses[id]={id,name,exam:exam||'',color:COLORS[n%COLORS.length],tpl:tpl||'classique',sections:mkSecs(tpl),items:[],annexes:[]};if(demo)S.courses[id].demo=1;return S.courses[id]}
 function openPick(cid){
   const c=S.courses[cid];if(!c)return;const ex=pickOf(cid),rows={};
   for(const it of c.items){let a=it.s.indexOf('0')+1;if(a<1)a=it.s.indexOf('1')+1;if(a<1)a=1;rows[it.id]={on:false,a,b:Math.min(it.n,a+(it.mode==='l'?5:10)-1)}}
@@ -649,7 +755,7 @@ function openPick(cid){
 }
 function nextPick(){if(T.pkQueue&&T.pkQueue.length){const n=T.pkQueue.shift();M=null;openPick(n)}else M=null}
 const A={
-  tab(el){V.tab=el.dataset.t;V.course=null;try{history.replaceState(null,'','#'+V.tab)}catch(e){location.hash=V.tab}render();$('#view').scrollTop=0},
+  tab(el){V.tab=el.dataset.t;V.course=null;if(V.tab==='reglages')checkAdmin();try{history.replaceState(null,'','#'+V.tab)}catch(e){location.hash=V.tab}render();$('#view').scrollTop=0},
   close(){closeModal()},
   confirm(){const f=M&&M.ok;M=null;if(f)f();else refresh()},
   checkin(){T.ck=(S.main.plan[TODAY()]||[]).filter(id=>S.courses[id]);if(!T.ck.length)T.ck=suggestToday();T.ckTodos=[];T.ckMan=false;openModal(mCheckin)},
@@ -661,7 +767,7 @@ const A={
   stop(){const t=S.main.timer;if(!t)return;if(t.t0){t.acc=(t.acc||0)+Date.now()-t.t0;t.t0=null}T.bmanual=false;T.bc=t.c;T.bmin=Math.max(1,Math.round(t.acc/60000));T.bnote='';stamp('main');saveLocal();openModal(mBilan)},
   manual(){T.bmanual=true;T.bc=((S.main.plan[TODAY()]||[])[0])||'';T.bmin=30;T.bnote='';openModal(mBilan)},
   discard(){const u=snap('main');S.main.timer=null;M=null;commit('main');toast('Session non comptée.',u)},
-  savesession(){const u=snap('main','log'),min=Math.max(1,Math.min(900,parseInt(T.bmin)||0));if(!T.bmanual)S.main.timer=null;S.log.sessions.push({id:uid(),d:TODAY(),c:T.bc||'',min,at:Date.now(),note:(T.bnote||'').slice(0,300)});M=null;commit('main','log');toast('+'+min+' points. Total du jour : '+fmtDur(minOn(TODAY())),u)},
+  savesession(){const sid=uid(),u0=snap('main','log'),u=()=>{S.del=S.del||{};S.del['s_'+sid]=Date.now();u0()},min=Math.max(1,Math.min(900,parseInt(T.bmin)||0));if(!T.bmanual)S.main.timer=null;S.log.sessions.push({id:sid,d:TODAY(),c:T.bc||'',min,at:Date.now(),note:(T.bnote||'').slice(0,300)});M=null;commit('main','log');toast('+'+min+' points. Total du jour : '+fmtDur(minOn(TODAY())),u)},
   brkopen(){openModal(mBreak)},
   brk(el){const m=+el.dataset.m,t=S.main.timer;if(t&&t.t0){t.acc=(t.acc||0)+Date.now()-t.t0;t.t0=null}const d=dayOf();d.br=d.br||[];d.br.push({at:nowMin(),min:m});S.main.brk={until:Date.now()+m*60000,min:m,at:Date.now()};M=null;commit('main');toast('Pause de '+m+' min. Horaire décalé.')},
   resume(){const b=S.main.brk,t=S.main.timer;if(b){const real=Math.max(1,Math.ceil((Date.now()-b.at)/60000)),br=dayOf().br;if(br&&br.length&&real<b.min)br[br.length-1].min=real}S.main.brk=null;if(t&&!t.t0)t.t0=Date.now();commit('main')},
@@ -681,6 +787,17 @@ const A={
   more(el){const u=snap('main'),d=dayOf();d.extra=d.extra||{};d.extra[el.dataset.c]=(d.extra[el.dataset.c]||0)+1;commit('main');toast('Voilà la suite.',u)},
   item(el){T.ic=el.dataset.c;T.ii=el.dataset.i;T.back=M&&M.fn===mBilan;openModal(mItem);if(T.back)M.back=mBilan;loadDoc(T.ii)},
   opendoc(){openDoc()},
+  annexadd(el){T.ax={c:el.dataset.c,type:'quizlet',url:'',title:'',txt:'',mode:'flashcards'};openModal(mAnnex)},
+  axtype(el){T.ax.type=el.dataset.t;refresh()},
+  annexopen(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;if(a.type==='deck'){T.dk={c:c.id,k:a.id,view:null};openModal(mDeck)}else if(a.type==='quizlet')openQuizlet(c,a);else if(a.type==='video')showViewer(a.title,`<iframe src="https://www.youtube-nocookie.com/embed/${ytId(a.url)}" title="${esc(a.title)}" allow="fullscreen; picture-in-picture; encrypted-media" allowfullscreen></iframe>`,`<a class="btn sm ghost" href="${esc(a.url)}" target="_blank" rel="noopener">Ouvrir sur YouTube</a>`)},
+  annexdel(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;const u=snap('c_'+c.id);c.annexes=c.annexes.filter(x=>x.id!==a.id);M=null;commit('c_'+c.id);toast('Annexe supprimée.',u)},
+  dkview(el){T.dk.view=T.dk.view===el.dataset.v?null:el.dataset.v;refresh()},
+  dkdel(el){const a=findAnnex(T.dk.c,T.dk.k);if(!a)return;a.cards=a.cards.filter(x=>x.id!==el.dataset.id);commit('c_'+T.dk.c)},
+  study(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;const q=(el.dataset.all?a.cards:deckDue(a)).map(x=>x.id);for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]]}T.st={c:c.id,k:a.id,q,flip:false,n:0,ok:0,miss:{}};openModal(mStudy)},
+  flip(){T.st.flip=!T.st.flip;refresh()},
+  grade(el){const st=T.st,a=findAnnex(st.c,st.k);if(!a)return;const id=st.q.shift(),x=a.cards.find(y=>y.id===id);if(!x){refresh();return}const g=+el.dataset.g;
+    if(g===0){x.box=0;x.due=TODAY();st.miss[id]=1;st.q.push(id)}else{if(g===1){x.box=Math.max(1,Math.min(x.box,2));x.due=addDays(TODAY(),1)}else{x.box=Math.min(6,x.box+1);x.due=addDays(TODAY(),LEIT[x.box])}st.n++;if(g===2&&!st.miss[id])st.ok++}
+    st.flip=false;commit('c_'+st.c)},
   closeviewer(){closeViewer()},
   pickattach(el){T.fileTarget={attach:el.dataset.i};$('#filepick').value=''},
   pickdir(el){T.fileTarget=el.dataset.c?{c:el.dataset.c}:null;$('#dirpick').value=''},
@@ -712,13 +829,23 @@ const A={
   delslot(el){S.main.slots.splice(+el.dataset.i,1);commit('main')},
   off(el){const d=+el.dataset.d;S.main.off=S.main.off.includes(d)?S.main.off.filter(x=>x!==d):[...S.main.off,d];commit('main')},
   syncnow(){syncNow().then(()=>toast(syncState==='ok'?'Synchronisé.':'Synchronisation impossible pour l\'instant.'))},
-  syncoff(){cfg=null;try{localStorage.removeItem(CFG)}catch(e){}syncState='local';refresh();toast('Appareil déconnecté. Les données restent ici.')},
+  authmode(el){V.auth=el.dataset.m;T.aerr='';render()},
+  localmode(){acct={local:true};saveAcct();V.gate=false;syncState='local';refresh()},
+  gotoauth(){V.gate=true;V.auth='login';T.aerr='';M=null;refresh()},
+  logout(){confirmBox('Se déconnecter ?','Tes données restent dans ton compte. Elles seront retirées de cet appareil.','Se déconnecter',()=>{syncNow().finally(doLogout)})},
+  delacct(){confirmBox('Supprimer ton compte ?','Ton compte et toutes tes données (cours, progression, sessions) seront supprimés définitivement, sur tous tes appareils.','Supprimer définitivement',async()=>{try{const {error}=await sb.rpc('delete_me');if(error)throw error;await doLogout();toast('Ton compte a été supprimé.')}catch(e){toast('Suppression impossible : '+AUTH_ERR(e.message))}})},
+  chpw(){T.pwRecovery=false;openModal(mNewPw)},
+  feedback(){if(!signedIn()){toast('Connecte-toi pour envoyer un avis.');return}T.fb={r:0,msg:''};openModal(mFeedback)},
+  star(el){T.fb.r=+el.dataset.r;refresh()},
+  dismissnews(el){const id=+el.dataset.id;let d=[];try{d=JSON.parse(localStorage.getItem('smartblocus.dismissed')||'[]')}catch(e){}d.push(id);try{localStorage.setItem('smartblocus.dismissed',JSON.stringify(d.slice(-50)))}catch(e){}news=news.filter(n=>n.id!==id);render()},
+  mergekeep(){const R=T.remote;S={main:fixMain(R.main),log:{sessions:Array.isArray((R.log||{}).sessions)?R.log.sessions:[]},courses:{},del:R.del||{}};for(const k in (R.courses||{}))S.courses[k]=fixCourse(R.courses[k]);saveLocal();M=null;T.remote=null;needPush=false;afterLogin();toast('Données du compte chargées.')},
+  mergeall(){const R=T.remote;M=null;T.remote=null;mergeRemote(R);needPush=true;saveLocal();afterLogin();toast('Données fusionnées.')},
   demo(){loadDemo();commit('main','log',...Object.keys(S.courses).map(k=>'c_'+k));toast('Exemple chargé.')},
   cleardemo(){const ids=Object.values(S.courses).filter(c=>c.demo).map(c=>c.id);ids.forEach(id=>delete S.courses[id]);S.log.sessions=S.log.sessions.filter(s=>!s.demo);for(const d in S.main.plan){S.main.plan[d]=S.main.plan[d].filter(x=>!ids.includes(x));if(!S.main.plan[d].length)delete S.main.plan[d]}S.main.todos=S.main.todos.filter(t=>!t.demo);S.main.rewards=S.main.rewards.filter(r=>!r.demo);S.main.days={};commit('main','log',...ids.map(k=>'c_'+k))},
   async backup(){try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Sauvegarde copiée. Colle-la dans une note.')}catch(e){toast('Copie refusée par le navigateur.')}},
   restore(){openModal(mRestore)},
   dorestore(){try{const r=JSON.parse($('#rs-text').value);if(!r||!r.main)throw 0;const old=Object.keys(S.courses);S.main=fixMain(r.main);S.log=r.log&&Array.isArray(r.log.sessions)?r.log:{sessions:[]};S.courses={};for(const k in (r.courses||{}))S.courses[k]=fixCourse(r.courses[k]);M=null;commit('main','log',...old.map(k=>'c_'+k),...Object.keys(S.courses).map(k=>'c_'+k));toast('Sauvegarde restaurée.')}catch(e){toast('Ce texte n\'est pas une sauvegarde Smart Blocus.')}},
-  reset(){confirmBox('Tout effacer ?','Cours, planning, sessions et récompenses seront supprimés sur tous tes appareils reliés.','Tout effacer',()=>{const old=Object.keys(S.courses);S={main:blankMain(),log:{sessions:[]},courses:{}};V.course=null;try{indexedDB.deleteDatabase('smartblocus-files')}catch(e){}IDB.db=null;commit('main','log',...old.map(k=>'c_'+k))})}
+  reset(){confirmBox('Tout effacer ?',signedIn()?'Cours, planning, sessions et récompenses seront supprimés de ton compte, sur tous tes appareils.':'Cours, planning, sessions et récompenses seront supprimés de cet appareil.','Tout effacer',()=>{const old=Object.keys(S.courses);const dl=S.del||{},now=Date.now();S.log.sessions.forEach(x=>dl['s_'+x.id]=now);S={main:blankMain(),log:{sessions:[]},courses:{},del:dl};V.course=null;try{indexedDB.deleteDatabase('smartblocus-files')}catch(e){}IDB.db=null;commit('main','log',...old.map(k=>'c_'+k))})}
 };
 const C={
   todo(el){const x=S.main.todos.find(t=>t.id===el.dataset.id);if(!x)return;x.done=el.checked?1:0;x.dd=el.checked?TODAY():'';commit('main')},
@@ -733,6 +860,8 @@ const C={
   icat(el){const it=curItem();if(it){it.t=el.value;commit('c_'+T.ic)}},
   iskip(el){const it=curItem();if(it){it.skip=el.checked?1:0;commit('c_'+T.ic)}},
   focus(el){S.main.focus=+el.value||0;commit('main')},
+  qzmode(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;a.mode=el.value;commit('c_'+c.id);openQuizlet(c,a)},
+  dkrev(el){const a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;a.rev=el.checked?1:0;commit('c_'+el.dataset.c)},
   ckman(el){T.ckMan=el.checked},
   pkon(el){const r=T.pk.rows[el.dataset.i];if(r)r.on=el.checked},
   pka(el){const r=T.pk.rows[el.dataset.i];if(!r)return;r.a=el.value;r.on=true;const cb=$('#pk-'+el.dataset.i);if(cb)cb.checked=true},
@@ -743,7 +872,21 @@ const C={
   imtpl(el){IMP.tpl[el.dataset.n]=el.value;refresh()}
 };
 const F={
-  async synclink(){const tk=$('#sy-token').value.trim();if(!tk)return;toast('Connexion à GitHub…');try{const found=await linkSync(tk);toast(found?'Appareil relié. Données récupérées.':'Synchronisation activée. Colle le même jeton sur tes autres appareils.')}catch(e){cfg=null;syncState='local';refresh();toast(e.status===401?'Jeton refusé. Vérifie qu\'il est complet.':e.status===403||e.status===404?'Ce jeton n\'a pas le droit « gist ».':'Connexion impossible. Vérifie internet.')}},
+  async auth(){
+    const email=(T.aemail||'').trim(),pw=T.apw||'',m=V.auth||'login';if(!email||pw.length<6){T.aerr=pw.length<6?'Le mot de passe doit faire au moins 6 caractères.':'Indique ton e-mail.';render();return}
+    if(!sb){T.aerr='Le serveur ne répond pas. Vérifie ta connexion internet.';render();return}
+    T.abusy=true;T.aerr='';render();
+    try{
+      if(m==='signup'){const {data,error}=await sb.auth.signUp({email,password:pw,options:{emailRedirectTo:redirectUrl()}});if(error)throw error;
+        if(data.user&&Array.isArray(data.user.identities)&&!data.user.identities.length)throw new Error('already registered');
+        if(data.session)await onLogin(data.user);else{V.auth='sent';T.apw=''}}
+      else{const {data,error}=await sb.auth.signInWithPassword({email,password:pw});if(error)throw error;await onLogin(data.user)}
+    }catch(e){T.aerr=AUTH_ERR(e&&e.message)}
+    T.abusy=false;refresh();
+  },
+  async reset(){const email=(T.aemail||'').trim();if(!email||!sb)return;T.abusy=true;render();try{const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:redirectUrl()});if(error)throw error;V.auth='resetsent'}catch(e){T.aerr=AUTH_ERR(e.message)}T.abusy=false;render()},
+  async newpw(){const a=$('#np-1').value,b=$('#np-2').value;if(a.length<6){toast('6 caractères minimum.');return}if(a!==b){toast('Les deux mots de passe sont différents.');return}try{const {error}=await sb.auth.updateUser({password:a});if(error)throw error;M=null;T.pwRecovery=false;refresh();toast('Mot de passe enregistré.')}catch(e){toast(AUTH_ERR(e.message))}},
+  async fb(){const msg=($('#fb-msg').value||'').trim();if(!msg){toast('Écris quelques mots.');return}try{const {error}=await sb.from('feedback').insert({user_id:acct.id,email:acct.email,rating:T.fb.r||null,message:msg.slice(0,2000),app_version:APP_VERSION});if(error)throw error;M=null;refresh();toast('Merci pour ton avis !')}catch(e){toast('Envoi impossible : '+AUTH_ERR(e.message))}},
   todo(){const i=$('#todo-in'),v=i.value.trim();if(!v)return;S.main.todos.push({id:uid(),text:v.slice(0,200),d:TODAY(),done:0});commit('main');const n=$('#todo-in');if(n)n.focus()},
   cktodo(){const i=$('#ck-todo'),v=i.value.trim();if(!v)return;T.ckTodos.push(v.slice(0,200));refresh();const n=$('#ck-todo');if(n)n.focus()},
   reward(){const l=$('#rw-label').value.trim(),c=parseInt($('#rw-cost').value);if(!l||!(c>0)){toast('Donne un nom et un nombre de points.');return}S.main.rewards.push({id:uid(),label:l.slice(0,80),cost:Math.min(100000,c),n:0});commit('main')},
@@ -754,17 +897,25 @@ const F={
     if(x){const was=x.g;x.name=name.slice(0,60);x.g=T.sg;if(was==='x'&&T.sg!=='x')c.items.forEach(i=>{if(i.t===x.id)i.skip=0});if(was!=='x'&&T.sg==='x')c.items.forEach(i=>{if(i.t===x.id)i.skip=1})}
     else c.sections.push({id:uid(),name:name.slice(0,60),g:T.sg});
     M=null;commit('c_'+c.id)},
+  annex(){const x=T.ax,c=S.courses[x.c];if(!c)return;const url=(x.url||'').trim();let a={id:uid(),type:x.type,title:(x.title||'').trim().slice(0,100)};
+    if(x.type==='quizlet'){if(!qzId(url)){toast('Ce lien ne ressemble pas à un set Quizlet.');return}a.url=url;a.mode=x.mode||'flashcards';a.title=a.title||'Set Quizlet'}
+    else if(x.type==='video'){if(!ytId(url)){toast('Ce lien ne ressemble pas à une vidéo YouTube.');return}a.url=url;a.title=a.title||'Vidéo'}
+    else if(x.type==='link'){if(!okUrl(url)){toast('L\'adresse doit commencer par https://');return}a.url=url;a.title=a.title||hostOf(url)}
+    else{const cards=parseCards(x.txt);if(!cards.length){toast('Aucune carte reconnue. Mets une carte par ligne : terme, tabulation, définition.');return}a.cards=cards;a.title=a.title||'Flashcards'}
+    (c.annexes||(c.annexes=[])).push(a);M=null;commit('c_'+c.id);toast(x.type==='deck'?a.cards.length+' cartes ajoutées.':'Annexe ajoutée.')},
+  dkadd(){const a=findAnnex(T.dk.c,T.dk.k);if(!a)return;const cards=parseCards($('#dk-add').value);if(!cards.length){toast('Aucune carte reconnue.');return}const have=new Set(a.cards.map(x=>x.f+'\u0001'+x.b));const nw=cards.filter(x=>!have.has(x.f+'\u0001'+x.b));a.cards.push(...nw);T.dk.view=null;commit('c_'+T.dk.c);toast(nw.length+' carte'+(nw.length>1?'s':'')+' ajoutée'+(nw.length>1?'s':'')+'.')},
   pktxt(){const i=$('#pk-txt'),v=i.value.trim();if(!v)return;T.pk.txt.push({id:uid(),txt:v.slice(0,200),done:0});refresh();const n=$('#pk-txt');if(n)n.focus()}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;
   if(el.dataset.a==='close'&&M&&M.back){const b=M.back;M={fn:b};refresh();return}
   if(el.dataset.a==='close'&&M&&M.fn===mBilan&&!T.bmanual&&S.main.timer&&!S.main.timer.t0)S.main.timer.t0=Date.now();
   const f=A[el.dataset.a];if(f)f(el,e)});
-document.addEventListener('change',e=>{const el=e.target.closest('[data-ch]');if(el&&C[el.dataset.ch])C[el.dataset.ch](el)});
-document.addEventListener('input',e=>{const el=e.target;if(el.dataset&&el.dataset.tmp)T[el.dataset.tmp]=el.value;if(el.dataset&&(el.dataset.ch==='pka'||el.dataset.ch==='pkb'))C[el.dataset.ch](el);if(el.id==='pg-range'){const o=$('#pg-out');if(o)o.textContent=el.value+' / '+el.max}});
+document.addEventListener('change',e=>{if(e.target.dataset&&e.target.dataset.tmp2&&T.ax)T.ax[e.target.dataset.tmp2]=e.target.value;const el=e.target.closest('[data-ch]');if(el&&C[el.dataset.ch])C[el.dataset.ch](el)});
+document.addEventListener('input',e=>{const el=e.target;if(el.dataset&&el.dataset.tmp)T[el.dataset.tmp]=el.value;if(el.dataset&&el.dataset.tmp2&&T.ax){T.ax[el.dataset.tmp2]=el.value;if(el.id==='ax-txt'){const o=$('#ax-count');if(o)o.firstChild.textContent=parseCards(el.value).length+' carte(s) reconnue(s). '}}if(el.dataset&&(el.dataset.ch==='pka'||el.dataset.ch==='pkb'))C[el.dataset.ch](el);if(el.id==='pg-range'){const o=$('#pg-out');if(o)o.textContent=el.value+' / '+el.max}});
 document.addEventListener('submit',e=>{e.preventDefault();const f=e.target.dataset.f;if(f&&F[f])F[f]()});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(!$('#viewer').hidden)closeViewer();else if(M)closeModal();return}
+  if(M&&M.fn===mStudy&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){if(e.key===' '||e.key==='Enter'){e.preventDefault();A.flip();return}if(T.st.flip&&['1','2','3'].includes(e.key)){A.grade({dataset:{g:String(+e.key-1)}});return}}
   const el=e.target;if((e.key==='Enter'||e.key===' ')&&el.matches&&el.matches('label[role="button"]')){e.preventDefault();el.click()}});
 
 /* ---------- documents gardés sur l'appareil ---------- */
@@ -786,7 +937,7 @@ function openDoc(){
   const r=T.doc&&T.doc.rec;if(!r)return;if(viewUrl)URL.revokeObjectURL(viewUrl);viewUrl=URL.createObjectURL(r.blob);
   const t=r.type||mimeOf(r.name);
   if(t==='application/pdf'||t.startsWith('image/')){
-    const v=$('#viewer');v.innerHTML=`<header><b class="grow" style="overflow-wrap:anywhere">${esc(r.name)}</b><a class="btn sm ghost" href="${viewUrl}" download="${esc(r.name)}">Télécharger</a><button class="btn sm pri" data-a="closeviewer">Fermer</button></header>${t.startsWith('image/')?`<img src="${viewUrl}" alt="${esc(r.name)}">`:`<iframe src="${viewUrl}" title="${esc(r.name)}"></iframe>`}`;v.hidden=false;
+    showViewer(r.name,t.startsWith('image/')?`<img src="${viewUrl}" alt="${esc(r.name)}">`:`<iframe src="${viewUrl}" title="${esc(r.name)}"></iframe>`,`<a class="btn sm ghost" href="${viewUrl}" download="${esc(r.name)}">Télécharger</a>`);
   }else{const a=document.createElement('a');a.href=viewUrl;a.download=r.name;document.body.appendChild(a);a.click();a.remove();toast('Le fichier s\'ouvre dans son application.')}
 }
 function closeViewer(){const v=$('#viewer');v.hidden=true;v.innerHTML=''}
@@ -910,7 +1061,7 @@ window.addEventListener('drop',async e=>{if(!hasFiles(e))return;e.preventDefault
 function loadDemo(){
   const t=TODAY(),mk=(t2,name,n,s,skip)=>({id:uid(),t:t2,name,key:'',n,s:s||'',skip:skip?1:0});
   const a=newCourse('Mathématiques générales',addDays(t,12),1);a.items=[mk('syn','Synthèse complète',38,'2'.repeat(14)),mk('sli','Chapitre 1 – Limites',42,'2'.repeat(42)),mk('sli','Chapitre 2 – Dérivées',56,'2'.repeat(20)),mk('sli','Chapitre 3 – Intégrales',61),mk('exo','Séance 1',12,'222122222222'),mk('exo','Séance 2',15,'2212'),mk('exo','Séance 3',18),mk('exo','Corrigés',1,'',1)];fixCourse(a);
-  const l=newCourse('Anglais',addDays(t,9),1,'langue');l.items=[mk('voc','Unit 1 – Business',40,'2'.repeat(25)+'111'),mk('voc','Unit 2 – Travel',35),mk('gra','Present perfect et past simple',12,'2'.repeat(12)),mk('gra','Les conditionnels',9),mk('exl','Workbook',30,'2'.repeat(8)),mk('ora','Listening tests',6,'21'),mk('ecr','Formal email',3)];fixCourse(l);
+  const l=newCourse('Anglais',addDays(t,9),1,'langue');l.annexes=[{id:uid(),type:'deck',title:'Unit 1 – Business',cards:parseCards('to borrow\temprunter\nto lend\tprêter\na loan\tun prêt\nrevenue\tle chiffre d\'affaires\na shareholder\tun actionnaire\nto hire\tembaucher\nto fire\tlicencier\na deadline\tune échéance')},{id:uid(),type:'link',title:'Dictionnaire WordReference',url:'https://www.wordreference.com/enfr/'}];l.items=[mk('voc','Unit 1 – Business',40,'2'.repeat(25)+'111'),mk('voc','Unit 2 – Travel',35),mk('gra','Present perfect et past simple',12,'2'.repeat(12)),mk('gra','Les conditionnels',9),mk('exl','Workbook',30,'2'.repeat(8)),mk('ora','Listening tests',6,'21'),mk('ecr','Formal email',3)];fixCourse(l);
   const b=newCourse('Microéconomie',addDays(t,17),1);b.items=[mk('syn','Résumé du cours',24,'2'.repeat(6)),mk('sli','Partie 1 – Consommateur',70,'2'.repeat(35)),mk('sli','Partie 2 – Producteur',64),mk('exo','TP 1 à 4',20,'22221')];fixCourse(b);
   S.main.plan[t]=[a.id,l.id];
   for(let i=1;i<=5;i++)S.log.sessions.push({id:uid(),d:addDays(t,-i),c:i%2?a.id:l.id,min:[210,325,150,290,260][i-1],at:Date.now()-i*864e5,note:'',demo:1});
@@ -923,7 +1074,7 @@ function loadDemo(){
 loadLocal();
 {const h=(location.hash||'').slice(1);if(TABS.some(t=>t[0]===h))V.tab=h}
 window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)&&h!==V.tab){V.tab=h;V.course=null;render()}});
-refresh();syncNow();
+bootAuth();refresh();syncNow();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
 window.addEventListener('online',()=>syncNow());
 setInterval(()=>{if(!document.hidden)syncNow()},45000);
