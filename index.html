@@ -284,7 +284,7 @@ const LS='smartblocus.v1';
 function fixItem(it,g){it.n=Math.max(1,Math.min(2000,parseInt(it.n)||1));it.s=String(it.s||'').slice(0,it.n).padEnd(it.n,'0');it.mode=it.mode||(g==='p'?'l':'p');it.t=String(it.t||'');return it}
 function fixCourse(c){
   c.color=c.color||COLORS[0];c.exam=c.exam||'';c.items=Array.isArray(c.items)?c.items:[];
-  c.annexes=Array.isArray(c.annexes)?c.annexes:[];c.annexes.forEach(a=>{if(a.type==='deck')a.cards=(Array.isArray(a.cards)?a.cards:[]).map(x=>({id:x.id||uid(),f:String(x.f||''),b:String(x.b||''),box:+x.box||0,due:x.due||''}))});
+  c.annexes=Array.isArray(c.annexes)?c.annexes:[];c.annexes.forEach(a=>{if(a.type==='deck')a.cards=(Array.isArray(a.cards)?a.cards:[]).map(x=>({id:x.id||uid(),f:String(x.f||''),b:String(x.b||''),box:+x.box||0,due:x.due||'',r:+x.r||0}))});
   if(!Array.isArray(c.sections))c.sections=mkSecs('classique');
   for(const it of c.items)if(!c.sections.some(x=>x.id===it.t)){let x=c.sections.find(y=>y.g==='x')||c.sections[c.sections.length-1];if(!x){x={id:'gen',name:'Contenu',g:'t'};c.sections.push(x)}it.t=x.id}
   c.items.forEach(it=>fixItem(it,gOf(c,it)));return c}
@@ -449,8 +449,24 @@ const goalMin=()=>S.main.slots.reduce((a,s)=>a+Math.max(0,hm2min(s.e)-hm2min(s.s
 const timerMs=()=>{const t=S.main.timer;return t?(t.acc||0)+(t.t0?Date.now()-t.t0:0):0};
 const minOn=k=>S.log.sessions.reduce((a,s)=>a+(s.d===k?s.min:0),0);
 const minToday=()=>minOn(TODAY())+timerMs()/60000;
-function streak(){const ds=new Set(S.log.sessions.map(s=>s.d));let k=TODAY(),n=0;if(!ds.has(k))k=addDays(k,-1);while(ds.has(k)){n++;k=addDays(k,-1)}return n}
-function points(){const g=goalMin();const by={};S.log.sessions.forEach(s=>by[s.d]=(by[s.d]||0)+s.min);let p=0,goals=0;for(const d in by){p+=by[d];if(g&&by[d]>=g*.8){p+=100;goals++}}const td=S.main.todos.filter(t=>t.done).length;p+=td*15;return {total:Math.round(p),avail:Math.round(p)-(S.main.spent||0),goals,mins:Object.values(by).reduce((a,b)=>a+b,0)}}
+function activeDays(){const ds=new Set(S.log.sessions.map(s=>s.d));Object.keys(S.main.act||{}).forEach(d=>ds.add(d));if(S.main.timer&&timerMs()>0)ds.add(TODAY());return ds}
+function streak(){const ds=activeDays();let k=TODAY(),n=0;if(!ds.has(k))k=addDays(k,-1);while(ds.has(k)){n++;k=addDays(k,-1)}return n}
+function markActive(){const t=TODAY();S.main.act=S.main.act||{};if(S.main.act[t])return;S.main.act[t]=1;const ks=Object.keys(S.main.act).sort();while(ks.length>400)delete S.main.act[ks.shift()]}
+const todoCount=()=>S.main.todoPts!=null?S.main.todoPts:S.main.todos.filter(t=>t.done).length;
+/* Points calculés à partir de ce qui est enregistré : ils se synchronisent et suivent les annulations. */
+function points(){
+  const by={};S.log.sessions.forEach(x=>by[x.d]=(by[x.d]||0)+(+x.min||0));
+  const live=timerMs()/60000;if(live>0)by[TODAY()]=(by[TODAY()]||0)+live;
+  let time=0,goals=0;for(const d in by){time+=by[d];const g=isOff(d)?0:goalMin();if(g&&by[d]>=g*.75)goals++}
+  let prog=0,cards=0;
+  for(const c of Object.values(S.courses)){
+    for(const it of c.items){if(it.skip||gOf(c,it)==='x')continue;const w=it.n===1?5:it.mode==='l'?3:1;for(const ch of it.s){if(ch==='2')prog+=w;else if(ch==='1')prog+=w/2}}
+    for(const a of (c.annexes||[]))if(a.type==='deck')for(const x of a.cards)cards+=(+x.r||0);
+  }
+  const parts={time:Math.floor(time),prog:Math.floor(prog),cards,tasks:todoCount()*15,goals:goals*100};
+  const total=parts.time+parts.prog+parts.cards+parts.tasks+parts.goals;
+  return {total,avail:Math.max(0,total-(S.main.spent||0)),goals,mins:time,parts};
+}
 function suggestToday(){const t=TODAY();return courses().filter(c=>(cProg(c)||0)<1&&(!c.exam||c.exam>t)).map(c=>({c,u:(1-(cProg(c)||0))/Math.max(1,c.exam?daysBetween(t,c.exam):30)})).sort((a,b)=>b.u-a.u).slice(0,2).map(x=>x.c.id)}
 function autofill(){
   const t=TODAY(),cs=courses().filter(c=>(cProg(c)||0)<1);if(!cs.length)return 0;
@@ -620,20 +636,36 @@ function viewProgress(){
   const pts=points(),cs=courses(),t=TODAY(),lvl=Math.floor(pts.total/300)+1,into=pts.total%300;
   const days=[];for(let i=13;i>=0;i--)days.push(addDays(t,-i));const vals=days.map(minOn),mx=Math.max(60,...vals);
   let h=`<div class="wrap"><header><h1>Ma <span class="hl">progression</span></h1></header>
-  <div class="stats"><div class="stat"><b class="num">${fmtDur(pts.mins)}</b><span>étudié au total</span></div><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.goals}</b><span>objectifs journaliers atteints</span></div></div>
+  <div class="stats"><div class="stat"><b class="num">${fmtDur(pts.mins)}</b><span>étudié au total</span></div><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.goals}</b><span>objectifs journaliers atteints (75 % de ton horaire)</span></div></div>
   <div class="cols"><div class="col"><section class="card flat"><h2>Heures par jour</h2><div class="chart" role="img" aria-label="Temps étudié sur 14 jours">${vals.map((v,i)=>`<div class="${days[i]===t?'t':''}" style="height:${Math.round(v/mx*100)}%" title="${fmtDay(days[i],{day:'numeric',month:'short'})} : ${fmtDur(v)}"></div>`).join('')}</div><div class="chartx">${days.map((d,i)=>`<span>${i%2?'':parseD(d).getDate()}</span>`).join('')}</div><p class="small mute" style="margin:0">14 derniers jours. Le plus haut : ${fmtDur(Math.max(...vals))}.</p></section>
   <section class="card flat"><h2>Avancement par cours</h2>${cs.length?cs.map(c=>{const p=cProg(c);return `<div><div class="row between small"><b>${esc(c.name)}</b><span class="num">${pct(p)}</span></div>${bar(p,c.color)}</div>`}).join(''):'<p class="mute small" style="margin:0">Ajoute un cours pour voir ta progression.</p>'}</section></div>
-  <div class="col"><section class="card"><div class="row between"><h2>Niveau ${lvl}</h2><span class="pill num">${pts.total} points gagnés</span></div>${bar(into/300,'var(--good)')}<p class="small mute" style="margin:0">Encore ${300-into} points avant le niveau ${lvl+1}. 1 minute étudiée = 1 point, une tâche cochée = 15, un objectif journalier atteint = 100.</p></section>
+  <div class="col"><section class="card"><div class="row between"><h2>Niveau ${lvl}</h2><span class="pill num">${pts.total} points gagnés</span></div>${bar(into/300,'var(--good)')}<p class="small mute" style="margin:0">Encore ${300-into} points avant le niveau ${lvl+1}.</p>
+  <div class="small" style="display:flex;flex-direction:column;gap:4px">${[['Temps d\'étude (1 pt par minute)',pts.parts.time],['Matière maîtrisée (1 pt par page, 3 par exercice)',pts.parts.prog],['Flashcards (1 pt par carte révisée)',pts.parts.cards],['Tâches cochées (15 pts)',pts.parts.tasks],['Objectifs journaliers (100 pts)',pts.parts.goals]].map(x=>`<div class="row between"><span class="mute">${x[0]}</span><b class="num">${x[1]}</b></div>`).join('')}${S.main.spent?`<div class="row between"><span class="mute">Dépensés en récompenses</span><b class="num">−${S.main.spent}</b></div>`:''}</div></section>
   <section class="card"><div class="row between"><h2>Mes récompenses</h2><span class="pill good num">${pts.avail} à dépenser</span></div>`;
   h+=S.main.rewards.length?S.main.rewards.map(r=>`<div class="row"><span class="grow"><b>${esc(r.label)}</b><br><span class="small mute num">${r.cost} points${r.n?' · pris '+r.n+' fois':''}</span></span><button class="btn sm acc" data-a="claim" data-id="${r.id}" ${pts.avail>=r.cost?'':'disabled'}>Je me l'offre</button><button class="x" data-a="delreward" data-id="${r.id}" aria-label="Supprimer">×</button></div>`).join(''):`<p class="mute small" style="margin:0">Fixe-toi tes propres récompenses : un épisode de série, une sortie, un dessert. Tu les débloques avec tes points.</p>`;
-  h+=`<form class="row" data-f="reward"><input type="text" id="rw-label" placeholder="Ex. un épisode de série" aria-label="Récompense"><input type="number" id="rw-cost" placeholder="Points" min="1" style="width:96px" aria-label="Coût en points"><button class="btn pri" aria-label="Ajouter">${I.plus}</button></form></section>
+  h+=`<form class="row" data-f="reward"><input type="text" id="rw-label" placeholder="Ex. un épisode de série" aria-label="Récompense"><input type="number" id="rw-cost" placeholder="Points" min="1" style="width:116px" aria-label="Coût en points"><button class="btn pri" aria-label="Ajouter">${I.plus}</button></form></section>
   <section class="card flat"><h2>Badges</h2><div class="badges">${badges(pts).map(b=>`<div class="badge ${b[2]?'on':''}"><b>${b[0]}</b>${b[1]}</div>`).join('')}</div></section></div></div></div>`;
   return h;
 }
-function badges(pts){const st=streak(),ps=Object.values(S.courses).map(c=>cProg(c)||0),mx=Math.max(0,...ps);return [
-  ['Premier pas','Une première session',S.log.sessions.length>0],['Régulier','3 jours d\'affilée',st>=3],['Inarrêtable','7 jours d\'affilée',st>=7],
+function badges(pts){const st=streak(),ps=Object.values(S.courses).filter(c=>!c.demo).map(c=>cProg(c)||0),mx=Math.max(0,...ps);return [
+  ['Premier pas','Une première session ou un premier point maîtrisé',S.log.sessions.length>0||pts.parts.prog>0],['Régulier','3 jours d\'affilée',st>=3],['Inarrêtable','7 jours d\'affilée',st>=7],
   ['10 heures','10 h au compteur',pts.mins>=600],['25 heures','25 h au compteur',pts.mins>=1500],['50 heures','50 h au compteur',pts.mins>=3000],
-  ['Mi-chemin','Un cours à 50 %',mx>=.5],['Bouclé','Un cours à 100 %',mx>=.999],['Dans les temps','5 objectifs journaliers',pts.goals>=5]]}
+  ['Mi-chemin','Un cours à 50 %',mx>=.5],['Bouclé','Un cours à 100 %',mx>=.999],
+  ['Objectif atteint','Une journée à 75 % de ton horaire',pts.goals>=1],['Dans les temps','5 objectifs journaliers',pts.goals>=5],
+  ['Mémoire vive','100 cartes de flashcards révisées',pts.parts.cards>=100],['Organisé','10 tâches cochées',todoCount()>=10]]}
+function toastSoon(msg){const t=$('#toast');if(!t.hidden){setTimeout(()=>toastSoon(msg),1200);return}toast(msg)}
+/* Annonce les nouveaux badges et niveaux, une seule fois (mémorisé dans tes données). */
+function checkBadges(){
+  if(V.gate||syncState==='connecting')return;
+  const pts=points(),got=badges(pts).filter(b=>b[2]).map(b=>b[0]),lvl=Math.floor(pts.total/300)+1;
+  if(Object.values(S.courses).some(c=>c.demo))return;
+  const seen=S.main.badgesSeen;
+  if(!Array.isArray(seen)){S.main.badgesSeen=got;S.main.lvlSeen=lvl;stamp('main');saveLocal();pushSoon();return}
+  const nw=got.filter(b=>!seen.includes(b));let ch=false;
+  if(nw.length){S.main.badgesSeen=seen.concat(nw);ch=true;nw.forEach(b=>toastSoon('Badge débloqué : '+b+' !'))}
+  if(lvl>(S.main.lvlSeen||1)){S.main.lvlSeen=lvl;ch=true;toastSoon('Niveau '+lvl+' atteint !')}
+  if(ch){stamp('main');saveLocal();pushSoon()}
+}
 function viewSettings(){
   const wd=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
   return `<div class="wrap"><header class="row between wrapr"><h1><span class="hl">Réglages</span></h1>${syncPill()}</header>
@@ -661,7 +693,7 @@ function viewGate(){
 }
 function render(){$('#nav').hidden=!!V.gate;if(V.gate){$('#view').innerHTML=viewGate();return}renderNav();const v=$('#view');v.innerHTML=V.tab==='cours'?viewCourses():V.tab==='planning'?viewPlan():V.tab==='progres'?viewProgress():V.tab==='reglages'?viewSettings():viewToday()}
 function refresh(){
-  ensureDay();render();
+  ensureDay();checkBadges();render();
   if(M){const sh=$('#modal .sheet'),st=sh?sh.scrollTop:0;$('#modal').innerHTML=`<div class="scrim" data-a="close"></div><div class="sheet" role="dialog" aria-modal="true">${M.fn()}</div>`;$('#modal').hidden=false;const s2=$('#modal .sheet');if(s2)s2.scrollTop=st}
   else{$('#modal').hidden=true;$('#modal').innerHTML='';
     if(!V.gate&&syncState!=='connecting'&&!ckSkipped&&Object.keys(S.courses).length&&!(S.main.days[TODAY()]||{}).ck&&!Object.values(S.courses).every(c=>c.demo))A.checkin()}
@@ -772,7 +804,7 @@ const A={
   brkopen(){openModal(mBreak)},
   brk(el){const m=+el.dataset.m,t=S.main.timer;if(t&&t.t0){t.acc=(t.acc||0)+Date.now()-t.t0;t.t0=null}const d=dayOf();d.br=d.br||[];d.br.push({at:nowMin(),min:m});S.main.brk={until:Date.now()+m*60000,min:m,at:Date.now()};M=null;commit('main');toast('Pause de '+m+' min. Horaire décalé.')},
   resume(){const b=S.main.brk,t=S.main.timer;if(b){const real=Math.max(1,Math.ceil((Date.now()-b.at)/60000)),br=dayOf().br;if(br&&br.length&&real<b.min)br[br.length-1].min=real}S.main.brk=null;if(t&&!t.t0)t.t0=Date.now();commit('main')},
-  mark(el){const c=S.courses[el.dataset.c],it=c&&c.items.find(i=>i.id===el.dataset.i);if(!it)return;const u=snap('c_'+c.id,'main');setParts(c,it,el.dataset.p.split(',').map(Number),el.dataset.v);if(el.dataset.k){const e=pickEntry(c.id,el.dataset.k);if(e)e.done=el.dataset.v}commit('c_'+c.id,'main');toast(el.dataset.v==='2'?'Maîtrisé, bien joué.':'Noté. Ça reviendra en premier la prochaine fois.',u)},
+  mark(el){const c=S.courses[el.dataset.c],it=c&&c.items.find(i=>i.id===el.dataset.i);if(!it)return;const u=snap('c_'+c.id,'main'),p0=points().total;setParts(c,it,el.dataset.p.split(',').map(Number),el.dataset.v);markActive();if(el.dataset.k){const e=pickEntry(c.id,el.dataset.k);if(e)e.done=el.dataset.v}commit('c_'+c.id,'main');const dp=points().total-p0;toast((el.dataset.v==='2'?'Maîtrisé, bien joué.':'Noté, ça reviendra en premier.')+(dp>0?' +'+dp+' points.':''),u)},
   undone(el){const e=pickEntry(el.dataset.c,el.dataset.k);if(!e)return;e.done=0;commit('main')},
   ptxt(el){const e=pickEntry(el.dataset.c,el.dataset.k);if(!e)return;e.done=e.done?0:'2';commit('main')},
   pick(el){openPick(el.dataset.c)},
@@ -797,8 +829,8 @@ const A={
   study(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;const q=(el.dataset.all?a.cards:deckDue(a)).map(x=>x.id);for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]]}T.st={c:c.id,k:a.id,q,flip:false,n:0,ok:0,miss:{}};openModal(mStudy)},
   flip(){T.st.flip=!T.st.flip;refresh()},
   grade(el){const st=T.st,a=findAnnex(st.c,st.k);if(!a)return;const id=st.q.shift(),x=a.cards.find(y=>y.id===id);if(!x){refresh();return}const g=+el.dataset.g;
-    if(g===0){x.box=0;x.due=TODAY();st.miss[id]=1;st.q.push(id)}else{if(g===1){x.box=Math.max(1,Math.min(x.box,2));x.due=addDays(TODAY(),1)}else{x.box=Math.min(6,x.box+1);x.due=addDays(TODAY(),LEIT[x.box])}st.n++;if(g===2&&!st.miss[id])st.ok++}
-    st.flip=false;commit('c_'+st.c)},
+    x.r=(x.r||0)+1;markActive();if(g===0){x.box=0;x.due=TODAY();st.miss[id]=1;st.q.push(id)}else{if(g===1){x.box=Math.max(1,Math.min(x.box,2));x.due=addDays(TODAY(),1)}else{x.box=Math.min(6,x.box+1);x.due=addDays(TODAY(),LEIT[x.box])}st.n++;if(g===2&&!st.miss[id])st.ok++}
+    st.flip=false;commit('c_'+st.c,'main')},
   closeviewer(){closeViewer()},
   pickattach(el){T.fileTarget={attach:el.dataset.i};$('#filepick').value=''},
   pickdir(el){T.fileTarget=el.dataset.c?{c:el.dataset.c}:null;$('#dirpick').value=''},
@@ -810,7 +842,7 @@ const A={
   sg(el){T.sg=el.dataset.g;refresh()},
   delsec(){const c=S.courses[T.sc],x=c&&c.sections.find(y=>y.id===T.ss);if(!x)return;const n=c.items.filter(i=>i.t===x.id).length;confirmBox('Supprimer la section « '+x.name+' » ?',n?'Ses '+n+' fichiers et leur progression seront supprimés.':'Cette section est vide.','Supprimer',()=>{const u=snap('c_'+c.id);c.items=c.items.filter(i=>i.t!==x.id);c.sections=c.sections.filter(y=>y.id!==x.id);commit('c_'+c.id);toast('Section supprimée.',u)})},
   set1(el){const it=curItem();if(!it)return;it.s=el.dataset.v;commit('c_'+T.ic)},
-  cyc(el){const it=curItem();if(!it)return;const i=+el.dataset.n,a=[...it.s];a[i]=a[i]==='0'?'2':a[i]==='2'?'1':'0';it.s=a.join('');commit('c_'+T.ic)},
+  cyc(el){const it=curItem();if(!it)return;const i=+el.dataset.n,a=[...it.s];a[i]=a[i]==='0'?'2':a[i]==='2'?'1':'0';it.s=a.join('');markActive();commit('c_'+T.ic,'main')},
   allset(el){const it=curItem();if(!it)return;it.s=el.dataset.v.repeat(it.n);commit('c_'+T.ic)},
   delitem(){const c=S.courses[T.ic];if(!c)return;const u=snap('c_'+c.id);c.items=c.items.filter(i=>i.id!==T.ii);M=null;commit('c_'+c.id);toast('Fichier retiré.',u)},
   open(el){V.tab='cours';V.course=el.dataset.c;render();$('#view').scrollTop=0},
@@ -849,7 +881,7 @@ const A={
   reset(){confirmBox('Tout effacer ?',signedIn()?'Cours, planning, sessions et récompenses seront supprimés de ton compte, sur tous tes appareils.':'Cours, planning, sessions et récompenses seront supprimés de cet appareil.','Tout effacer',()=>{const old=Object.keys(S.courses);const dl=S.del||{},now=Date.now();S.log.sessions.forEach(x=>dl['s_'+x.id]=now);S={main:blankMain(),log:{sessions:[]},courses:{},del:dl};V.course=null;try{indexedDB.deleteDatabase('smartblocus-files')}catch(e){}IDB.db=null;commit('main','log',...old.map(k=>'c_'+k))})}
 };
 const C={
-  todo(el){const x=S.main.todos.find(t=>t.id===el.dataset.id);if(!x)return;x.done=el.checked?1:0;x.dd=el.checked?TODAY():'';commit('main')},
+  todo(el){const x=S.main.todos.find(t=>t.id===el.dataset.id);if(!x)return;const n0=todoCount();x.done=el.checked?1:0;x.dd=el.checked?TODAY():'';S.main.todoPts=Math.max(0,n0+(el.checked?1:-1));if(el.checked){markActive();toast('+15 points.')}commit('main')},
   cname(el){const c=S.courses[V.course];if(c&&el.value.trim()){c.name=el.value.trim().slice(0,80);commit('c_'+c.id)}},
   cexam(el){const c=S.courses[V.course];if(c){c.exam=el.value||'';commit('c_'+c.id)}},
   ccolor(el){const c=S.courses[V.course];if(c){c.color=el.value;commit('c_'+c.id)}},
