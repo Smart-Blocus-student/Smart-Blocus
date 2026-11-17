@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F5EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12151F" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Smart Blocus">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Smart Blocus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Idée : une feuille de bloc quadrillée, encre bleu nuit, surligneur jaune pour ce qui compte. */
+:root{
+  --paper:#F4F5EF; --card:#FFFFFF; --ink:#18203A; --mute:#636B84; --line:#D9DCE6; --grid:rgba(24,32,58,.055);
+  --hl:#FFDF3D; --pen:#2B55E0; --good:#16895A; --warn:#C96A10; --bad:#CC3B37; --soft:#EEF0F7;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",sans-serif;
+  --body:"Instrument Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#12151F; --card:#1B2030; --ink:#ECEEF6; --mute:#9AA2BC; --line:#31384E; --grid:rgba(236,238,246,.045);
+    --hl:#FFDF3D; --pen:#8AA4FF; --good:#4CC790; --warn:#F0A04B; --bad:#FF7A72; --soft:#242A3D;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12151F; --card:#1B2030; --ink:#ECEEF6; --mute:#9AA2BC; --line:#31384E; --grid:rgba(236,238,246,.045);
+  --hl:#FFDF3D; --pen:#8AA4FF; --good:#4CC790; --warn:#F0A04B; --bad:#FF7A72; --soft:#242A3D;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font:400 16px/1.45 var(--body);-webkit-font-smoothing:antialiased;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2.5px solid var(--pen);outline-offset:2px;border-radius:6px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:30px;font-weight:800;line-height:1.05}
+h2{font-size:19px;font-weight:800}
+h3{font-size:16px;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.mute{color:var(--mute)} .small{font-size:13.5px}
+.hl{background:linear-gradient(transparent 52%,var(--hl) 52%,var(--hl) 92%,transparent 92%);padding:0 3px;color:var(--ink)}
+:root[data-theme="dark"] .hl,.darkfix .hl{color:#12151F}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hl{background:none;color:var(--hl);padding:0}}
+:root[data-theme="dark"] .hl{background:none;color:var(--hl);padding:0}
+
+.app{height:100%;display:flex;flex-direction:column}
+main{flex:1;overflow:auto;padding:calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 28px calc(16px + env(safe-area-inset-left));-webkit-overflow-scrolling:touch}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+nav{order:2;display:flex;background:var(--card);border-top:1.5px solid var(--ink);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 9px;font-size:11px;font-weight:600;color:var(--mute)}
+nav button svg{width:22px;height:22px}
+nav button[aria-current="page"]{color:var(--ink)}
+nav button[aria-current="page"] span{background:linear-gradient(transparent 50%,var(--hl) 50%);color:var(--ink)}
+:root[data-theme="dark"] nav button[aria-current="page"] span{color:#12151F;background:var(--hl);padding:0 4px;border-radius:3px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) nav button[aria-current="page"] span{color:#12151F;background:var(--hl);padding:0 4px;border-radius:3px}}
+.brand{display:none}
+@media (min-width:900px){
+  .app{flex-direction:row}
+  nav{order:0;flex-direction:column;width:210px;border-top:0;border-right:1.5px solid var(--ink);padding:22px 12px;gap:4px;justify-content:flex-start}
+  nav button{flex:none;flex-direction:row;gap:10px;padding:10px 12px;font-size:15px;border-radius:8px;justify-content:flex-start}
+  .brand{display:block;font:800 22px/1 var(--display);padding:0 12px 18px}
+  main{padding:30px 32px 40px}
+  .cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+}
+.cols{display:flex;flex-direction:column;gap:18px}
+@media (min-width:900px){.cols{display:grid}}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+
+.card{background:var(--card);border:1.5px solid var(--ink);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card.flat{border-color:var(--line)}
+.row{display:flex;align-items:center;gap:10px;min-width:0}
+.row.wrapr{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.between{justify-content:space-between}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border-radius:9px;font-weight:600;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);min-height:44px;text-align:center}
+.btn.pri{background:var(--ink);color:var(--paper)}
+.btn.acc{background:var(--hl);color:#18203A;border-color:#18203A}
+.btn.ghost{border-color:var(--line)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:6px 11px;min-height:34px;font-size:14px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn svg{width:18px;height:18px;flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;border:1.5px solid var(--line);font-size:14px;font-weight:600;background:var(--card);min-height:34px}
+.chip .dot,.dot{width:10px;height:10px;border-radius:50%;background:var(--cc,var(--pen));flex:none}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--soft)}
+.chip[aria-pressed="true"]::before{content:"✓";font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--soft);white-space:nowrap}
+.pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{background:var(--card);border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;min-height:42px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus{border-color:var(--pen);outline:none}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13.5px;font-weight:600;color:var(--mute);min-width:0}
+.bar{height:9px;border-radius:99px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--cc,var(--pen));border-radius:99px}
+.ringt{font:800 15px var(--display);fill:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.stat{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font:800 24px/1.1 var(--display)}
+.stat span{font-size:12.5px;color:var(--mute);font-weight:600}
+.timer{font:800 52px/1 var(--display);letter-spacing:-.02em}
+.slot{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);font-size:14.5px}
+.slot.now{border-color:var(--ink);background:var(--soft)}
+.slot.past{opacity:.5}
+.slot b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.task{display:flex;align-items:stretch;gap:6px}
+.tmain{flex:1;min-width:0;text-align:left;padding:9px 11px;border:1.5px solid var(--line);border-radius:9px;display:flex;flex-direction:column;gap:1px;background:var(--card)}
+.task.redo .tmain{border-color:var(--warn)}
+.tname{font-weight:600;overflow-wrap:anywhere}
+.tlab{font-size:13.5px;color:var(--mute)}
+.task.redo .tlab{color:var(--warn);font-weight:600}
+.qb{width:44px;border-radius:9px;border:1.5px solid var(--line);display:grid;place-items:center;flex:none;background:var(--card)}
+.qb svg{width:20px;height:20px}
+.qb.ok{color:var(--good);border-color:var(--good)} .qb.re{color:var(--warn);border-color:var(--warn)}
+.todo{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line)}
+.todo:last-child{border-bottom:0}
+.todo input{width:20px;height:20px;min-height:0;margin-top:2px;flex:none;accent-color:var(--ink)}
+.todo.done span{text-decoration:line-through;color:var(--mute)}
+.todo span{flex:1;overflow-wrap:anywhere}
+.x{color:var(--mute);padding:2px 6px;font-size:18px;line-height:1}
+.ccard{display:flex;gap:14px;align-items:center;text-align:left;width:100%}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.item:last-child{border-bottom:0}
+.item .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.item.skip .nm{color:var(--mute)}
+.mini{width:54px;flex:none}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px}
+.pb{height:42px;border-radius:8px;border:1.5px solid var(--line);font-weight:700;font-variant-numeric:tabular-nums;background:var(--card)}
+.pb.s1{background:var(--warn);border-color:var(--warn);color:#fff}
+.pb.s2{background:var(--good);border-color:var(--good);color:#fff}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:9px;overflow:hidden}
+.seg button{flex:1;padding:9px 6px;font-weight:600;font-size:14px;min-height:42px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.dayrow{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.dayrow:last-child{border-bottom:0}
+.dayrow .dt{width:84px;flex:none;font-weight:700;font-size:14px}
+.dayrow .dt small{display:block;font-weight:500;color:var(--mute)}
+.dayrow.today .dt b{background:linear-gradient(transparent 50%,var(--hl) 50%)}
+.chart{display:flex;align-items:flex-end;gap:5px;height:120px;border-bottom:1.5px solid var(--ink);padding-top:6px}
+.chart div{flex:1;background:var(--pen);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.chart div.t{background:var(--hl);outline:1.5px solid var(--ink)}
+.chartx{display:flex;gap:5px;font-size:10.5px;color:var(--mute)}
+.chartx span{flex:1;text-align:center}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.badge{border:1.5px dashed var(--line);border-radius:10px;padding:10px;font-size:13.5px;color:var(--mute)}
+.badge.on{border:1.5px solid var(--ink);color:var(--ink);background:var(--hl);color:#18203A}
+.badge b{display:block;font-family:var(--display)}
+.banner{border:1.5px dashed var(--ink);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);font-size:14px}
+#modal{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center}
+#modal[hidden],#toast[hidden]{display:none}
+.scrim{position:absolute;inset:0;background:rgba(10,14,28,.55)}
+.sheet{position:relative;background:var(--paper);border:1.5px solid var(--ink);border-bottom:0;border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:92%;overflow:auto;padding:20px 16px 24px;display:flex;flex-direction:column;gap:14px}
+@media (min-width:640px){#modal{align-items:center}.sheet{border-bottom:1.5px solid var(--ink);border-radius:16px;padding:24px}}
+#toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14.5px;z-index:30;max-width:calc(100% - 32px);text-align:center}
+@media (min-width:900px){#toast{bottom:28px}}
+.sync{font-size:12.5px;font-weight:600;color:var(--mute);display:inline-flex;align-items:center;gap:6px}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--mute)}
+.sync.ok i{background:var(--good)} .sync.local i{background:var(--warn)} .sync.err i{background:var(--bad)}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .35s ease}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav id="nav" aria-label="Sections"></nav>
+  <main id="view"></main>
+</div>
+<div id="modal" hidden></div>
+<div id="toast" role="status" hidden></div>
+<input type="file" id="dirpick" webkitdirectory multiple hidden>
+<script>
+"use strict";
+/* ---------- utilitaires ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-4);
+const pad=n=>String(n).padStart(2,'0');
+const dkey=(d=new Date())=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const TODAY=()=>dkey();
+const parseD=k=>{const a=k.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
+const addDays=(k,n)=>{const d=parseD(k);d.setDate(d.getDate()+n);return dkey(d)};
+const daysBetween=(a,b)=>Math.round((parseD(b)-parseD(a))/864e5);
+const hm2min=s=>{const a=String(s||'0:0').split(':').map(Number);return (a[0]||0)*60+(a[1]||0)};
+const min2hm=m=>{m=((Math.round(m)%1440)+1440)%1440;return pad(Math.floor(m/60))+':'+pad(m%60)};
+const nowMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
+const fmtDur=m=>{m=Math.max(0,Math.round(m));const h=Math.floor(m/60);return h?h+' h '+pad(m%60):m+' min'};
+const fmtClock=ms=>{const s=Math.max(0,Math.floor(ms/1000));return (s>=3600?Math.floor(s/3600)+':':'')+pad(Math.floor(s/60)%60)+':'+pad(s%60)};
+const fmtDay=(k,o)=>new Intl.DateTimeFormat('fr-BE',o||{weekday:'long',day:'numeric',month:'long'}).format(parseD(k));
+const cap=x=>x.charAt(0).toUpperCase()+x.slice(1);
+const pct=p=>Math.round((p||0)*100)+' %';
+const norm=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const clone=o=>JSON.parse(JSON.stringify(o));
+const natural=(a,b)=>a.localeCompare(b,'fr',{numeric:true,sensitivity:'base'});
+const CATS={syn:'Synthèses',sli:'Slides',exo:'Exercices',aut:'Autres'};
+const CAT_ORDER=['syn','sli','exo','aut'];
+const COLORS=['#2B55E0','#E0552B','#16895A','#A640CC','#C98A00','#0E97A6','#D93F74','#66752B'];
+const I={
+  today:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></svg>',
+  book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21a2 2 0 0 0 2 2h13"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>',
+  redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 6.2"/><path d="M20 4v7h-7"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  folder:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>'
+};
+
+/* ---------- état ---------- */
+const blankMain=()=>({v:1,slots:[{s:'08:00',e:'10:00'},{s:'10:30',e:'12:30'},{s:'14:00',e:'16:00'},{s:'16:30',e:'18:30'}],off:[],plan:{},days:{},todos:[],rewards:[],spent:0,timer:null,brk:null});
+let S={main:blankMain(),log:{sessions:[]},courses:{}};
+let V={tab:'aujourdhui',course:null};
+let T={};            // valeurs temporaires des formulaires
+let M=null;          // modale ouverte : {fn}
+let ckSkipped=false;
+const LS='smartblocus.v1';
+
+function fixItem(it){it.n=Math.max(1,Math.min(2000,parseInt(it.n)||1));it.s=String(it.s||'').slice(0,it.n).padEnd(it.n,'0');it.mode=it.mode||(it.t==='exo'?'l':'p');if(!CATS[it.t])it.t='aut';return it}
+function fixCourse(c){c.items=(c.items||[]).map(fixItem);c.color=c.color||COLORS[0];c.exam=c.exam||'';return c}
+function fixMain(m){return Object.assign(blankMain(),m||{})}
+function saveLocal(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
+function loadLocal(){try{const r=JSON.parse(localStorage.getItem(LS)||'null');if(r&&r.main){S.del=r.del||{};S.main=fixMain(r.main);S.log=r.log&&Array.isArray(r.log.sessions)?r.log:{sessions:[]};S.courses={};for(const k in (r.courses||{}))S.courses[k]=fixCourse(r.courses[k])}}catch(e){}}
+const hasData=()=>Object.keys(S.courses).length>0||S.log.sessions.length>0||S.main.todos.length>0;
+
+/* ---------- synchronisation entre appareils (Gist privé GitHub) ---------- */
+const CFG='smartblocus.sync',GFILE='smart-blocus.json';
+let cfg=null;try{cfg=JSON.parse(localStorage.getItem(CFG)||'null')}catch(e){}
+let syncState=cfg&&cfg.gist?'connecting':'local',pushT=null,busy=false,again=false,needPush=false;
+const docData=id=>id==='main'?S.main:id==='log'?S.log:(S.courses[id.slice(2)]||null);
+function setDoc(id,data){
+  if(id==='main')S.main=fixMain(data);
+  else if(id==='log')S.log={sessions:Array.isArray(data.sessions)?data.sessions:[],_t:data._t};
+  else if(id.startsWith('c_'))S.courses[id.slice(2)]=fixCourse(data);
+}
+function stamp(...ids){const t=Date.now();S.del=S.del||{};ids.forEach(id=>{const d=docData(id);if(d)d._t=t;else S.del[id]=t});needPush=true}
+function commit(...ids){stamp(...ids);saveLocal();pushSoon();refresh()}
+function pushSoon(ms){if(!cfg||!cfg.gist)return;clearTimeout(pushT);pushT=setTimeout(syncNow,ms||1500)}
+async function gh(path,opt){
+  const r=await fetch('https://api.github.com'+path,Object.assign({headers:{'Authorization':'Bearer '+cfg.token,'Accept':'application/vnd.github+json'},cache:'no-store'},opt||{}));
+  if(!r.ok){const e=new Error('GitHub '+r.status);e.status=r.status;throw e}
+  return r.json();
+}
+async function readRemote(){
+  const g=await gh('/gists/'+cfg.gist),f=g.files&&g.files[GFILE];if(!f)return null;
+  let txt=f.content;if(f.truncated)txt=await (await fetch(f.raw_url,{cache:'no-store'})).text();
+  try{return JSON.parse(txt)}catch(e){return null}
+}
+/* Fusion : pour chaque bloc (réglages, journal, chaque cours), la version modifiée le plus récemment gagne. */
+function mergeRemote(R){
+  let changed=false;S.del=S.del||{};
+  if(!R||!R.main){needPush=true;return false}
+  const rd=R.del||{};for(const id in rd)if(rd[id]>(S.del[id]||0))S.del[id]=rd[id];
+  const rc=R.courses||{};
+  const ids=new Set(['main','log',...Object.keys(S.courses).map(k=>'c_'+k),...Object.keys(rc).map(k=>'c_'+k)]);
+  for(const id of ids){
+    const r=id==='main'?R.main:id==='log'?R.log:rc[id.slice(2)],l=docData(id);
+    const rt=r?r._t||0:-1,lt=l?l._t||0:-1,dt=S.del[id]||0;
+    if(id.startsWith('c_')&&dt>Math.max(rt,lt)){if(l){delete S.courses[id.slice(2)];changed=true}if(r)needPush=true;continue}
+    if(r&&rt>lt){setDoc(id,clone(r));changed=true}
+    else if(l&&lt>rt)needPush=true;
+  }
+  return changed;
+}
+async function syncNow(){
+  if(!cfg||!cfg.gist)return;if(busy){again=true;return}busy=true;const before=syncState;let changed=false;
+  try{
+    changed=mergeRemote(await readRemote());if(changed)saveLocal();
+    if(needPush){needPush=false;try{await gh('/gists/'+cfg.gist,{method:'PATCH',body:JSON.stringify({files:{[GFILE]:{content:JSON.stringify(S)}}})})}catch(e){needPush=true;throw e}}
+    syncState='ok';
+  }catch(e){syncState=(e.status===401||e.status===403||e.status===404)?'error':'stale'}
+  finally{busy=false;if(changed||syncState!==before)refresh();if(again){again=false;pushSoon(300)}}
+}
+async function linkSync(token){
+  cfg={token};
+  const list=await gh('/gists?per_page=100');
+  const found=list.find(g=>g.files&&g.files[GFILE]);
+  if(found)cfg.gist=found.id;
+  else{const g=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Smart Blocus – synchronisation',public:false,files:{[GFILE]:{content:JSON.stringify(S)}}})});cfg.gist=g.id}
+  try{localStorage.setItem(CFG,JSON.stringify(cfg))}catch(e){}
+  syncState='connecting';await syncNow();return !!found;
+}
+
+/* ---------- calculs ---------- */
+const courses=()=>Object.values(S.courses).sort((a,b)=>(a.exam||'9999').localeCompare(b.exam||'9999')||natural(a.name,b.name));
+const grpOf=it=>it.t==='exo'?'p':'t';
+const itemProg=it=>{let a=0;for(const ch of it.s)a+=ch==='2'?1:ch==='1'?.5:0;return a/it.n};
+function cProg(c,grp){const its=c.items.filter(i=>!i.skip&&(!grp||grpOf(i)===grp));if(!its.length)return null;return its.reduce((a,i)=>a+itemProg(i),0)/its.length}
+function remFrac(c,grp){let r=0;for(const it of c.items){if(it.skip||grpOf(it)!==grp)continue;let z=0;for(const ch of it.s)if(ch==='0')z++;r+=z/it.n}return r}
+const sortedItems=c=>c.items.slice().sort((a,b)=>CAT_ORDER.indexOf(a.t)-CAT_ORDER.indexOf(b.t)||natural(a.name,b.name));
+function studyDaysLeft(c,date){
+  const end=c.exam&&c.exam>date?c.exam:null;let planned=0;
+  for(const d in S.main.plan)if(d>date&&(!end||d<end)&&S.main.plan[d].includes(c.id))planned++;
+  planned++;
+  if(c.exam&&c.exam<=date)return 1;
+  if(planned>1)return planned;
+  return end?Math.max(1,daysBetween(date,end)):7;
+}
+function ensureDay(){
+  if(syncState==='connecting')return false;
+  const t=TODAY(),ids=S.main.plan[t]||[];if(!ids.length)return false;
+  const day=S.main.days[t]=S.main.days[t]||{};day.base=day.base||{};let ch=false;
+  for(const id of ids){const c=S.courses[id];if(c&&!day.base[id]){day.base[id]={t:remFrac(c,'t'),p:remFrac(c,'p'),dl:studyDaysLeft(c,t)};ch=true}}
+  if(ch){stamp('main');saveLocal();pushSoon()}
+  return ch;
+}
+function dayTasks(c){
+  const day=S.main.days[TODAY()]||{},base=day.base&&day.base[c.id],extra=(day.extra&&day.extra[c.id])||0;
+  const dl=base?base.dl:studyDaysLeft(c,TODAY());const items=sortedItems(c).filter(i=>!i.skip);
+  const tasks=[];let left=0;
+  for(const it of items){const p=[];for(let i=0;i<it.n;i++)if(it.s[i]==='1')p.push(i+1);if(p.length)tasks.push({kind:'redo',it,parts:p})}
+  for(const g of ['t','p']){
+    const cur=remFrac(c,g),b0=base?Math.max(base[g],cur):cur;left+=cur;
+    let budget=Math.min(b0,b0*(1+extra)/dl)-(b0-cur);
+    for(const it of items){
+      if(grpOf(it)!==g||budget<=1e-6)continue;const p=[];
+      for(let i=0;i<it.n&&budget>1e-6;i++)if(it.s[i]==='0'){p.push(i+1);budget-=1/it.n}
+      if(p.length)tasks.push({kind:'new',it,parts:p});
+    }
+  }
+  return {tasks,left,hasNew:tasks.some(t=>t.kind==='new')};
+}
+function ranges(a){const o=[];let i=0;while(i<a.length){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;o.push(j>i?a[i]+'–'+a[j]:''+a[i]);i=j+1}return o.join(', ')}
+function taskLabel(t){const it=t.it;if(it.n===1)return t.kind==='redo'?'À revoir : pas encore maîtrisé':(it.t==='exo'?'À faire':'À étudier');const r=ranges(t.parts);if(it.mode==='l')return (t.kind==='redo'?'Refaire n° ':'Faire n° ')+r;return (t.kind==='redo'?'Revoir p. ':'Lire p. ')+r}
+function slotsToday(){const br=(S.main.days[TODAY()]||{}).br||[];let prev=0;return S.main.slots.map(sl=>{const s=hm2min(sl.s),e=hm2min(sl.e);let sh=0;for(const b of br)if(b.at<e+prev)sh+=b.min;prev=sh;return {s:s+sh,e:e+sh,sh}})}
+const isOff=k=>S.main.off.includes(parseD(k).getDay());
+const goalMin=()=>S.main.slots.reduce((a,s)=>a+Math.max(0,hm2min(s.e)-hm2min(s.s)),0);
+const timerMs=()=>{const t=S.main.timer;return t?(t.acc||0)+(t.t0?Date.now()-t.t0:0):0};
+const minOn=k=>S.log.sessions.reduce((a,s)=>a+(s.d===k?s.min:0),0);
+const minToday=()=>minOn(TODAY())+timerMs()/60000;
+function streak(){const ds=new Set(S.log.sessions.map(s=>s.d));let k=TODAY(),n=0;if(!ds.has(k))k=addDays(k,-1);while(ds.has(k)){n++;k=addDays(k,-1)}return n}
+function points(){const g=goalMin();const by={};S.log.sessions.forEach(s=>by[s.d]=(by[s.d]||0)+s.min);let p=0,goals=0;for(const d in by){p+=by[d];if(g&&by[d]>=g*.8){p+=100;goals++}}const td=S.main.todos.filter(t=>t.done).length;p+=td*15;return {total:Math.round(p),avail:Math.round(p)-(S.main.spent||0),goals,mins:Object.values(by).reduce((a,b)=>a+b,0)}}
+function suggestToday(){const t=TODAY();return courses().filter(c=>(cProg(c)||0)<1&&(!c.exam||c.exam>t)).map(c=>({c,u:(1-(cProg(c)||0))/Math.max(1,c.exam?daysBetween(t,c.exam):30)})).sort((a,b)=>b.u-a.u).slice(0,2).map(x=>x.c.id)}
+function autofill(){
+  const t=TODAY(),cs=courses().filter(c=>(cProg(c)||0)<1);if(!cs.length)return 0;
+  const exams=cs.map(c=>c.exam).filter(e=>e>t).sort();const last=exams.length?addDays(exams[exams.length-1],-1):addDays(t,13);
+  const rem={},share={};
+  cs.forEach(c=>{rem[c.id]=Math.max(.15,1-(cProg(c)||0));const dl=c.exam>t?daysBetween(t,c.exam):daysBetween(t,last)+1;share[c.id]=rem[c.id]/Math.max(1,Math.ceil(dl*2/cs.length))});
+  let n=0;
+  for(let d=t;d<=last;d=addDays(d,1)){
+    const ex=(S.main.plan[d]||[]).filter(id=>S.courses[id]);
+    if(ex.length){ex.forEach(id=>{if(rem[id])rem[id]=Math.max(.02,rem[id]-share[id])});continue}
+    if(isOff(d))continue;
+    const av=cs.filter(c=>!c.exam||c.exam>d);if(!av.length)continue;
+    const eve=av.filter(c=>c.exam===addDays(d,1));
+    const sc=c=>rem[c.id]/Math.max(1,daysBetween(d,c.exam||addDays(last,7)));
+    const pick=[...new Set([...eve,...av.slice().sort((a,b)=>sc(b)-sc(a))])].slice(0,Math.max(eve.length,Math.min(2,av.length)));
+    S.main.plan[d]=pick.map(c=>c.id);pick.forEach(c=>rem[c.id]=Math.max(.02,rem[c.id]-share[c.id]));n++;
+  }
+  return n;
+}
+
+/* ---------- rendu ---------- */
+function ring(p,size,sw,label,color){const r=(size-sw)/2,c=2*Math.PI*r,h=size/2;return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${esc(label)}" style="flex:none"><circle cx="${h}" cy="${h}" r="${r}" fill="none" stroke="var(--soft)" stroke-width="${sw}"/><circle cx="${h}" cy="${h}" r="${r}" fill="none" stroke="${color||'var(--pen)'}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-Math.max(0,Math.min(1,p||0)))}" transform="rotate(-90 ${h} ${h})"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" class="ringt" style="font-size:${size>70?17:13}px">${esc(label)}</text></svg>`}
+const bar=(p,color)=>`<div class="bar" style="--cc:${color||'var(--pen)'}"><i style="width:${Math.round((p||0)*100)}%"></i></div>`;
+const syncPill=()=>syncState==='ok'?'<span class="sync ok"><i></i>Synchronisé</span>':syncState==='connecting'?'<span class="sync"><i></i>Synchronisation…</span>':syncState==='stale'?'<span class="sync local"><i></i>Hors ligne, synchro à la reconnexion</span>':syncState==='error'?'<button class="sync err" data-a="tab" data-t="reglages"><i></i>Synchronisation à reconnecter</button>':'<button class="sync local" data-a="tab" data-t="reglages"><i></i>Sur cet appareil seulement</button>';
+const TABS=[['aujourdhui','Aujourd\'hui',I.today],['cours','Cours',I.book],['planning','Planning',I.cal],['progres','Progrès',I.chart],['reglages','Réglages',I.gear]];
+function renderNav(){$('#nav').innerHTML='<div class="brand">Smart <span class="hl">Blocus</span></div>'+TABS.map(t=>`<button data-a="tab" data-t="${t[0]}" ${V.tab===t[0]?'aria-current="page"':''}>${t[2]}<span>${t[1]}</span></button>`).join('')}
+
+function taskRows(c){
+  const {tasks,left,hasNew}=dayTasks(c);let h='';
+  for(const t of tasks){
+    h+=`<div class="task ${t.kind}"><button class="tmain" data-a="item" data-c="${c.id}" data-i="${t.it.id}"><span class="tname">${esc(t.it.name)}</span><span class="tlab">${CATS[t.it.t]} · ${esc(taskLabel(t))}</span></button>
+    <button class="qb ok" data-a="mark" data-c="${c.id}" data-i="${t.it.id}" data-p="${t.parts.join(',')}" data-v="2" aria-label="Maîtrisé" title="Maîtrisé">${I.check}</button>
+    ${t.kind==='new'?`<button class="qb re" data-a="mark" data-c="${c.id}" data-i="${t.it.id}" data-p="${t.parts.join(',')}" data-v="1" aria-label="Fait, à revoir" title="Fait, à revoir">${I.redo}</button>`:''}</div>`;
+  }
+  if(!c.items.filter(i=>!i.skip).length)h+=`<p class="mute small" style="margin:0">Ce cours n'a pas encore de contenu. Ouvre-le dans Cours pour ajouter des fichiers.</p>`;
+  else if(!hasNew&&left>1e-6)h+=`<div class="row wrapr between"><span class="pill good">Objectif du jour atteint</span><button class="btn sm" data-a="more" data-c="${c.id}">J'avance vite, donne-moi la suite</button></div>`;
+  else if(!tasks.length)h+=`<span class="pill good">Tout est maîtrisé dans ce cours</span>`;
+  return h;
+}
+function timerCard(){
+  const t=S.main.timer,b=S.main.brk,c=t&&S.courses[t.c];
+  if(b){const over=b.until<=Date.now();return `<section class="card"><div class="row between"><h2>Pause</h2><span class="pill warn">Horaire décalé de ${b.min} min</span></div>
+    <div class="timer num" data-live="brk">${over?'00:00':fmtClock(b.until-Date.now())}</div>
+    <p class="mute small" style="margin:0" data-live="brkmsg">${over?'La pause est finie. On s\'y remet ?':'Reprise prévue à '+min2hm(new Date(b.until).getHours()*60+new Date(b.until).getMinutes())}</p>
+    <button class="btn pri" data-a="resume">${I.play}Reprendre</button></section>`}
+  if(t){return `<section class="card"><div class="row between"><h2>Session en cours</h2><span class="chip" style="--cc:${c?c.color:'var(--pen)'}"><span class="dot"></span>${esc(c?c.name:'Étude libre')}</span></div>
+    <div class="timer num" data-live="timer">${fmtClock(timerMs())}</div>
+    <div class="row"><button class="btn grow" data-a="brkopen">${I.pause}Pause</button><button class="btn pri grow" data-a="stop">${I.stop}Terminer</button></div></section>`}
+  return `<section class="card"><h2>Prêt à étudier ?</h2><p class="mute small" style="margin:0">Lance le chrono quand tu commences. À la fin, tu notes ce que tu maîtrises.</p>
+    <div class="row wrapr"><button class="btn acc grow" data-a="start">${I.play}Démarrer une session</button><button class="btn ghost" data-a="manual">Ajouter du temps</button></div>
+    <button class="btn ghost sm" data-a="brkopen" style="align-self:flex-start">${I.pause}J'ai besoin d'une pause</button></section>`;
+}
+function viewToday(){
+  const t=TODAY(),ids=(S.main.plan[t]||[]).filter(id=>S.courses[id]),goal=isOff(t)?0:goalMin(),mt=minToday(),pts=points(),sl=slotsToday(),nm=nowMin();
+  const day=S.main.days[t]||{};
+  let h=`<div class="wrap"><header class="row between wrapr"><div><p class="mute small" style="margin:0 0 2px">${cap(fmtDay(t))}</p><h1>Ton <span class="hl">blocus</span> du jour</h1></div>${syncPill()}</header>`;
+  if(Object.values(S.courses).some(c=>c.demo))h+=`<div class="banner"><span class="grow">Tu regardes des <b>données d'exemple</b>. Importe tes dossiers pour commencer pour de vrai.</span><button class="btn sm" data-a="cleardemo">Effacer l'exemple</button></div>`;
+  if(!Object.keys(S.courses).length){
+    return h+`<section class="card"><h2>Commence par tes cours</h2><p style="margin:0">Sur ton Mac, choisis le dossier qui contient tes cours. Chaque cours doit avoir quatre sous-dossiers : <b>Synthèse</b>, <b>Slides</b>, <b>Exercices</b> et <b>Autres</b>. Smart Blocus crée les cours et suit ta progression fichier par fichier.</p>
+    <div class="row wrapr"><button class="btn acc" data-a="import">${I.folder}Importer mes dossiers</button><button class="btn" data-a="addcourse">${I.plus}Ajouter un cours à la main</button><button class="btn ghost" data-a="demo">Voir un exemple</button></div></section></div>`;
+  }
+  h+=`<div class="stats"><div class="stat"><b class="num" data-live="mt">${fmtDur(mt)}</b><span>étudié aujourd'hui${goal?' sur '+fmtDur(goal):''}</span></div><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.avail}</b><span>points à dépenser</span></div></div>`;
+  h+=`<div class="cols"><div class="col">`;
+  if(!ids.length){h+=`<section class="card"><h2>Qu'est-ce que tu travailles aujourd'hui ?</h2><p class="mute small" style="margin:0">Choisis tes cours du jour pour recevoir ton programme.</p><button class="btn acc" data-a="checkin" style="align-self:flex-start">Choisir mes cours</button></section>`}
+  else{
+    for(const id of ids){const c=S.courses[id],p=cProg(c);
+      h+=`<section class="card"><div class="row between"><div class="row grow"><span class="dot" style="--cc:${c.color}"></span><h2 class="grow">${esc(c.name)}</h2></div>${examPill(c)}<span class="pill num">${pct(p)}</span></div>${bar(p,c.color)}${taskRows(c)}</section>`}
+    h+=`<button class="btn ghost sm" data-a="checkin" style="align-self:flex-start">Changer les cours du jour</button>`;
+  }
+  h+=`</div><div class="col">${timerCard()}`;
+  h+=`<section class="card flat"><div class="row between"><h2>Horaire</h2>${isOff(t)?'<span class="pill">Jour de repos</span>':(day.br&&day.br.length?`<span class="pill warn">${day.br.reduce((a,b)=>a+b.min,0)} min de pause</span>`:'')}</div>`;
+  h+=sl.length?sl.map((s,i)=>{const c=ids.length?S.courses[ids[Math.min(ids.length-1,Math.floor(i*ids.length/sl.length))]]:null;return `<div class="slot ${nm>=s.e?'past':nm>=s.s?'now':''}"><b>${min2hm(s.s)} – ${min2hm(s.e)}</b><span class="grow">${c?esc(c.name):'Étude'}</span>${s.sh?`<span class="pill warn">+${s.sh} min</span>`:''}</div>`}).join(''):'<p class="mute small" style="margin:0">Ajoute tes heures de travail dans Réglages.</p>';
+  h+=`</section>`;
+  const todos=S.main.todos.filter(x=>!x.done||x.dd===t);
+  h+=`<section class="card flat"><h2>To-do</h2><form class="row" data-f="todo"><input type="text" id="todo-in" placeholder="Ajouter une tâche" autocomplete="off" aria-label="Nouvelle tâche"><button class="btn pri" aria-label="Ajouter">${I.plus}</button></form><div>`;
+  h+=todos.length?todos.map(x=>`<label class="todo ${x.done?'done':''}"><input type="checkbox" data-ch="todo" data-id="${x.id}" ${x.done?'checked':''}><span>${esc(x.text)}${!x.done&&x.d<t?' <em class="mute small">(reporté)</em>':''}</span><button class="x" data-a="deltodo" data-id="${x.id}" aria-label="Supprimer">×</button></label>`).join(''):'<p class="mute small" style="margin:0">Rien pour l\'instant.</p>';
+  return h+`</div></section></div></div></div>`;
+}
+function examPill(c){if(!c.exam)return '';const d=daysBetween(TODAY(),c.exam);return d<0?'<span class="pill">Examen passé</span>':`<span class="pill ${d<=3?'bad':d<=7?'warn':''}">${d===0?'Examen aujourd\'hui':'J-'+d}</span>`}
+
+function viewCourses(){
+  const c=V.course&&S.courses[V.course];if(c)return viewCourse(c);
+  let h=`<div class="wrap"><header class="row between wrapr"><h1>Mes <span class="hl">cours</span></h1><div class="row"><button class="btn sm" data-a="import">${I.folder}Importer</button><button class="btn sm pri" data-a="addcourse">${I.plus}Cours</button></div></header>`;
+  const cs=courses();
+  if(!cs.length)return h+`<section class="card"><p style="margin:0">Aucun cours pour l'instant. Importe ton dossier de cours depuis ton Mac ou ajoute un cours à la main.</p></section></div>`;
+  h+=`<div class="cgrid">`+cs.map(c=>{const p=cProg(c),pt=cProg(c,'t'),pp=cProg(c,'p');return `<button class="card ccard" data-a="open" data-c="${c.id}" style="flex-direction:row">${ring(p,74,8,pct(p),c.color)}<span class="grow" style="display:flex;flex-direction:column;gap:5px"><span class="row between"><h3 class="grow">${esc(c.name)}</h3>${examPill(c)}</span><span class="small mute">Théorie ${pt==null?'–':pct(pt)} · Pratique ${pp==null?'–':pct(pp)}</span><span class="small mute">${c.items.length} fichier${c.items.length>1?'s':''}${c.exam?' · examen le '+fmtDay(c.exam,{day:'numeric',month:'short'}):''}</span></span></button>`}).join('')+`</div></div>`;
+  return h;
+}
+function viewCourse(c){
+  const p=cProg(c);
+  let h=`<div class="wrap"><button class="btn sm ghost" data-a="backc" style="align-self:flex-start">${I.back}Tous les cours</button>
+  <section class="card"><div class="row">${ring(p,84,9,pct(p),c.color)}<div class="grow" style="display:flex;flex-direction:column;gap:8px"><label class="f">Nom du cours<input type="text" id="c-name" value="${esc(c.name)}" data-ch="cname"></label></div></div>
+  <div class="row wrapr"><label class="f grow">Date de l'examen<input type="date" id="c-exam" value="${esc(c.exam)}" data-ch="cexam"></label><label class="f" style="width:120px">Couleur<select id="c-color" data-ch="ccolor">${COLORS.map((x,i)=>`<option value="${x}" ${x===c.color?'selected':''}>Couleur ${i+1}</option>`).join('')}</select></label></div>
+  ${c.exam&&c.exam>TODAY()&&p!=null?`<p class="small mute" style="margin:0">Il te reste ${pct(1-p)} à voir en ${daysBetween(TODAY(),c.exam)} jours.</p>`:''}</section>`;
+  for(const cat of CAT_ORDER){
+    const its=c.items.filter(i=>i.t===cat).sort((a,b)=>natural(a.name,b.name));
+    h+=`<section class="card flat"><div class="row between"><h2>${CATS[cat]}</h2><button class="btn sm ghost" data-a="additem" data-c="${c.id}" data-t="${cat}">${I.plus}Ajouter</button></div><div>`;
+    h+=its.length?its.map(it=>`<button class="item ${it.skip?'skip':''}" data-a="item" data-c="${c.id}" data-i="${it.id}"><span class="nm">${esc(it.name)}<br><span class="small mute">${it.skip?'Ne compte pas':it.n>1?(it.mode==='l'?it.n+' exercices':it.n+' pages'):'1 bloc'}</span></span><span class="mini">${it.skip?'':bar(itemProg(it),c.color)}</span><span class="small num" style="width:44px;text-align:right">${it.skip?'–':pct(itemProg(it))}</span></button>`).join(''):`<p class="mute small" style="margin:0">Aucun fichier.</p>`;
+    h+=`</div></section>`;
+  }
+  return h+`<button class="btn danger sm" data-a="delcourse" data-c="${c.id}" style="align-self:flex-start">Supprimer ce cours</button></div>`;
+}
+function viewPlan(){
+  const t=TODAY(),cs=courses();const exams=cs.map(c=>c.exam).filter(e=>e>=t).sort();
+  let last=addDays(t,13);if(exams.length&&exams[exams.length-1]>last)last=exams[exams.length-1];if(daysBetween(t,last)>90)last=addDays(t,90);
+  let h=`<div class="wrap"><header class="row between wrapr"><h1>Mon <span class="hl">planning</span></h1><button class="btn sm pri" data-a="autofill" ${cs.length?'':'disabled'}>Remplir les jours vides</button></header><p class="mute small" style="margin:0">Touche un jour pour choisir ce que tu y étudies. Le programme de chaque jour se calcule tout seul selon ce qu'il te reste à voir.</p><section class="card flat"><div>`;
+  for(let d=t;d<=last;d=addDays(d,1)){
+    const ids=(S.main.plan[d]||[]).filter(id=>S.courses[id]),ex=cs.filter(c=>c.exam===d);
+    h+=`<button class="dayrow ${d===t?'today':''}" data-a="planday" data-d="${d}"><span class="dt"><b style="text-transform:capitalize">${fmtDay(d,{weekday:'short'})}</b><small>${fmtDay(d,{day:'numeric',month:'short'})}</small></span><span class="row wrapr grow">${ex.map(c=>`<span class="pill bad">Examen · ${esc(c.name)}</span>`).join('')}${ids.map(id=>`<span class="chip" style="--cc:${S.courses[id].color}"><span class="dot"></span>${esc(S.courses[id].name)}</span>`).join('')}${!ids.length&&!ex.length?`<span class="mute small">${isOff(d)?'Repos':'À planifier'}</span>`:''}</span></button>`;
+  }
+  return h+`</div></section></div>`;
+}
+function viewProgress(){
+  const pts=points(),cs=courses(),t=TODAY(),lvl=Math.floor(pts.total/300)+1,into=pts.total%300;
+  const days=[];for(let i=13;i>=0;i--)days.push(addDays(t,-i));const vals=days.map(minOn),mx=Math.max(60,...vals);
+  let h=`<div class="wrap"><header><h1>Ma <span class="hl">progression</span></h1></header>
+  <div class="stats"><div class="stat"><b class="num">${fmtDur(pts.mins)}</b><span>étudié au total</span></div><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.goals}</b><span>objectifs journaliers atteints</span></div></div>
+  <div class="cols"><div class="col"><section class="card flat"><h2>Heures par jour</h2><div class="chart" role="img" aria-label="Temps étudié sur 14 jours">${vals.map((v,i)=>`<div class="${days[i]===t?'t':''}" style="height:${Math.round(v/mx*100)}%" title="${fmtDay(days[i],{day:'numeric',month:'short'})} : ${fmtDur(v)}"></div>`).join('')}</div><div class="chartx">${days.map((d,i)=>`<span>${i%2?'':parseD(d).getDate()}</span>`).join('')}</div><p class="small mute" style="margin:0">14 derniers jours. Le plus haut : ${fmtDur(Math.max(...vals))}.</p></section>
+  <section class="card flat"><h2>Avancement par cours</h2>${cs.length?cs.map(c=>{const p=cProg(c);return `<div><div class="row between small"><b>${esc(c.name)}</b><span class="num">${pct(p)}</span></div>${bar(p,c.color)}</div>`}).join(''):'<p class="mute small" style="margin:0">Ajoute un cours pour voir ta progression.</p>'}</section></div>
+  <div class="col"><section class="card"><div class="row between"><h2>Niveau ${lvl}</h2><span class="pill num">${pts.total} points gagnés</span></div>${bar(into/300,'var(--good)')}<p class="small mute" style="margin:0">Encore ${300-into} points avant le niveau ${lvl+1}. 1 minute étudiée = 1 point, une tâche cochée = 15, un objectif journalier atteint = 100.</p></section>
+  <section class="card"><div class="row between"><h2>Mes récompenses</h2><span class="pill good num">${pts.avail} à dépenser</span></div>`;
+  h+=S.main.rewards.length?S.main.rewards.map(r=>`<div class="row"><span class="grow"><b>${esc(r.label)}</b><br><span class="small mute num">${r.cost} points${r.n?' · pris '+r.n+' fois':''}</span></span><button class="btn sm acc" data-a="claim" data-id="${r.id}" ${pts.avail>=r.cost?'':'disabled'}>Je me l'offre</button><button class="x" data-a="delreward" data-id="${r.id}" aria-label="Supprimer">×</button></div>`).join(''):`<p class="mute small" style="margin:0">Fixe-toi tes propres récompenses : un épisode de série, une sortie, un dessert. Tu les débloques avec tes points.</p>`;
+  h+=`<form class="row" data-f="reward"><input type="text" id="rw-label" placeholder="Ex. un épisode de série" aria-label="Récompense"><input type="number" id="rw-cost" placeholder="Points" min="1" style="width:96px" aria-label="Coût en points"><button class="btn pri" aria-label="Ajouter">${I.plus}</button></form></section>
+  <section class="card flat"><h2>Badges</h2><div class="badges">${badges(pts).map(b=>`<div class="badge ${b[2]?'on':''}"><b>${b[0]}</b>${b[1]}</div>`).join('')}</div></section></div></div></div>`;
+  return h;
+}
+function badges(pts){const st=streak(),ps=Object.values(S.courses).map(c=>cProg(c)||0),mx=Math.max(0,...ps);return [
+  ['Premier pas','Une première session',S.log.sessions.length>0],['Régulier','3 jours d\'affilée',st>=3],['Inarrêtable','7 jours d\'affilée',st>=7],
+  ['10 heures','10 h au compteur',pts.mins>=600],['25 heures','25 h au compteur',pts.mins>=1500],['50 heures','50 h au compteur',pts.mins>=3000],
+  ['Mi-chemin','Un cours à 50 %',mx>=.5],['Bouclé','Un cours à 100 %',mx>=.999],['Dans les temps','5 objectifs journaliers',pts.goals>=5]]}
+function viewSettings(){
+  const wd=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  return `<div class="wrap"><header class="row between wrapr"><h1><span class="hl">Réglages</span></h1>${syncPill()}</header>
+  <div class="cols"><div class="col"><section class="card flat"><h2>Mes heures de travail</h2><p class="mute small" style="margin:0">Les plages d'une journée type. Une pause décale automatiquement les plages suivantes.</p>
+  ${S.main.slots.map((s,i)=>`<div class="row"><input type="time" id="sl-s${i}" value="${esc(s.s)}" data-ch="slot" data-i="${i}" data-k="s" aria-label="Début"><span>–</span><input type="time" id="sl-e${i}" value="${esc(s.e)}" data-ch="slot" data-i="${i}" data-k="e" aria-label="Fin"><button class="x" data-a="delslot" data-i="${i}" aria-label="Supprimer la plage">×</button></div>`).join('')}
+  <button class="btn sm" data-a="addslot" style="align-self:flex-start">${I.plus}Ajouter une plage</button>
+  <p class="small" style="margin:0">Total : <b class="num">${fmtDur(goalMin())}</b> par jour</p></section>
+  <section class="card flat"><h2>Jours de repos</h2><div class="row wrapr">${[1,2,3,4,5,6,0].map(d=>`<button class="chip" data-a="off" data-d="${d}" aria-pressed="${S.main.off.includes(d)}">${wd[d]}</button>`).join('')}</div></section></div>
+  <div class="col"><section class="card flat"><h2>Mes dossiers de cours</h2><p class="small" style="margin:0">Depuis ton Mac, choisis le dossier qui contient tous tes cours (ou un seul cours). Structure attendue : <b>Cours / Synthèse, Slides, Exercices, Autres</b>. Relance l'import quand tu ajoutes des fichiers : ta progression est conservée.</p><button class="btn acc" data-a="import" style="align-self:flex-start">${I.folder}Importer mes dossiers</button><p class="small mute" style="margin:0">Seuls les noms de fichiers et le nombre de pages sont enregistrés. Tes documents restent sur ton ordinateur.</p></section>
+  <section class="card ${cfg&&cfg.gist?'flat':''}"><h2>Synchronisation entre appareils</h2>${cfg&&cfg.gist?`<p class="small" style="margin:0">${syncState==='error'?'<b style="color:var(--bad)">Le jeton n\'est plus accepté.</b> Déconnecte puis colle un nouveau jeton.':'Cet appareil est relié. Tes cours, ton planning et tes sessions se retrouvent sur tous tes appareils reliés.'}</p><div class="row wrapr"><button class="btn sm" data-a="syncnow">Synchroniser maintenant</button><button class="btn sm ghost" data-a="syncoff">Déconnecter cet appareil</button></div>`:`<p class="small" style="margin:0">À faire une seule fois par appareil :</p><ol class="small" style="margin:0;padding-left:20px"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=Smart%20Blocus" target="_blank" rel="noopener">Crée un jeton GitHub</a> (case <b>gist</b> cochée, expiration : aucune).</li><li>Colle-le ici, sur chacun de tes appareils.</li></ol><form class="row" data-f="synclink"><input type="text" id="sy-token" placeholder="ghp_…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Jeton GitHub"><button class="btn pri">Relier</button></form><p class="small mute" style="margin:0">Tes données sont rangées dans un Gist privé de ton compte GitHub. Le jeton reste sur cet appareil.</p>`}</section>
+  <section class="card flat"><h2>Sauvegarde</h2><p class="small mute" style="margin:0">Une copie de secours à coller dans une note.</p><div class="row wrapr"><button class="btn sm" data-a="backup">Copier une sauvegarde</button><button class="btn sm" data-a="restore">Restaurer</button><button class="btn sm danger" data-a="reset">Tout effacer</button></div></section></div></div></div>`;
+}
+function render(){renderNav();const v=$('#view');v.innerHTML=V.tab==='cours'?viewCourses():V.tab==='planning'?viewPlan():V.tab==='progres'?viewProgress():V.tab==='reglages'?viewSettings():viewToday()}
+function refresh(){
+  ensureDay();render();
+  if(M){const sh=$('#modal .sheet'),st=sh?sh.scrollTop:0;$('#modal').innerHTML=`<div class="scrim" data-a="close"></div><div class="sheet" role="dialog" aria-modal="true">${M.fn()}</div>`;$('#modal').hidden=false;const s2=$('#modal .sheet');if(s2)s2.scrollTop=st}
+  else{$('#modal').hidden=true;$('#modal').innerHTML='';
+    if(syncState!=='connecting'&&!ckSkipped&&Object.keys(S.courses).length&&!(S.main.days[TODAY()]||{}).ck&&!Object.values(S.courses).every(c=>c.demo))A.checkin()}
+}
+function openModal(fn){M={fn};refresh()}
+function closeModal(){M=null;refresh()}
+let toastT;function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
+function confirmBox(title,text,ok,fn){openModal(()=>`<h2>${esc(title)}</h2><p style="margin:0">${esc(text)}</p><div class="row"><button class="btn grow" data-a="close">Annuler</button><button class="btn danger grow" data-a="confirm">${esc(ok)}</button></div>`);M.ok=fn}
+
+/* ---------- modales ---------- */
+function mCheckin(){
+  const h=new Date().getHours(),sel=T.ck||[];let redo='';
+  for(const c of courses()){const n=c.items.filter(i=>!i.skip).reduce((a,i)=>a+[...i.s].filter(x=>x==='1').length,0);if(n)redo+=`<li><b>${esc(c.name)}</b> : ${n} point${n>1?'s':''} à revoir</li>`}
+  return `<p class="mute small" style="margin:0">${cap(fmtDay(TODAY()))}</p><h2>${h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir'} ! Qu'est-ce que tu travailles <span class="hl">aujourd'hui</span> ?</h2>
+  ${redo?`<div class="banner" style="display:block"><b>À reprendre en priorité</b><ul style="margin:4px 0 0;padding-left:18px">${redo}</ul></div>`:''}
+  <div class="row wrapr">${courses().map(c=>`<button class="chip" style="--cc:${c.color}" data-a="cktog" data-c="${c.id}" aria-pressed="${sel.includes(c.id)}"><span class="dot"></span>${esc(c.name)}${c.exam&&c.exam>=TODAY()?' · J-'+daysBetween(TODAY(),c.exam):''}</button>`).join('')}</div>
+  <form class="row" data-f="cktodo"><input type="text" id="ck-todo" placeholder="Ajouter une tâche à ta to-do" autocomplete="off" aria-label="Nouvelle tâche"><button class="btn" aria-label="Ajouter">${I.plus}</button></form>
+  ${(T.ckTodos||[]).length?`<ul class="small" style="margin:0;padding-left:18px">${T.ckTodos.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}
+  <div class="row"><button class="btn ghost" data-a="ckskip">Plus tard</button><button class="btn acc grow" data-a="ckok">C'est parti</button></div>`;
+}
+function mPickCourse(){const ids=(S.main.plan[TODAY()]||[]).filter(id=>S.courses[id]);const rest=courses().filter(c=>!ids.includes(c.id));
+  const b=c=>`<button class="btn" style="justify-content:flex-start" data-a="startc" data-c="${c.id}"><span class="dot" style="--cc:${c.color}"></span>${esc(c.name)}</button>`;
+  return `<h2>Tu travailles quoi ?</h2>${ids.map(id=>b(S.courses[id])).join('')}${rest.length&&ids.length?'<p class="mute small" style="margin:0">Autres cours</p>':''}${rest.map(b).join('')}<button class="btn ghost" data-a="startc" data-c="">Étude libre</button>`}
+function mBreak(){return `<h2>Une pause de combien ?</h2><p class="mute small" style="margin:0">Le chrono s'arrête et tes plages suivantes sont décalées d'autant.</p><div class="row wrapr">${[5,10,15,20,30,45,60].map(m=>`<button class="btn" data-a="brk" data-m="${m}">${m} min</button>`).join('')}</div><button class="btn ghost" data-a="close">Annuler</button>`}
+function mBilan(){
+  const c=S.courses[T.bc];
+  return `<h2>${T.bmanual?'Ajouter du temps':'Bilan de la session'}</h2>
+  ${T.bmanual?`<label class="f">Cours<select id="b-course" data-ch="bcourse"><option value="">Étude libre</option>${courses().map(x=>`<option value="${x.id}" ${x.id===T.bc?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>`:`<span class="chip" style="align-self:flex-start;--cc:${c?c.color:'var(--pen)'}"><span class="dot"></span>${esc(c?c.name:'Étude libre')}</span>`}
+  <label class="f">Durée (minutes)<input type="number" id="b-min" min="1" max="900" value="${esc(T.bmin)}" data-tmp="bmin"></label>
+  ${c?`<div style="display:flex;flex-direction:column;gap:8px"><b>Qu'est-ce que tu as fait ?</b><p class="mute small" style="margin:0">Vert : maîtrisé. Orange : fait mais à revoir, ça reviendra en premier la prochaine fois.</p>${taskRows(c)}<button class="btn sm ghost" data-a="open2" data-c="${c.id}" style="align-self:flex-start">Voir tout le cours</button></div>`:''}
+  <label class="f">Note (facultatif)<input type="text" id="b-note" value="${esc(T.bnote||'')}" data-tmp="bnote" placeholder="Ex. revoir la démonstration du chapitre 3"></label>
+  <div class="row"><button class="btn ghost" data-a="${T.bmanual?'close':'discard'}">${T.bmanual?'Annuler':'Ne pas compter'}</button><button class="btn pri grow" data-a="savesession">Enregistrer</button></div>`;
+}
+function mItem(){
+  const c=S.courses[T.ic],it=c&&c.items.find(i=>i.id===T.ii);if(!it)return '<p>Fichier introuvable.</p><button class="btn" data-a="close">Fermer</button>';
+  const done=[...it.s].filter(x=>x!=='0').length;let body;
+  if(it.n===1)body=`<div class="seg">${[['0','Pas fait'],['1','À revoir'],['2','Maîtrisé']].map(x=>`<button data-a="set1" data-v="${x[0]}" aria-pressed="${it.s===x[0]}">${x[1]}</button>`).join('')}</div>`;
+  else if(it.mode==='l'&&it.n<=400)body=`<p class="mute small" style="margin:0">Touche un numéro : vert = maîtrisé, orange = à revoir, encore une fois = pas fait.</p><div class="pgrid">${[...it.s].map((x,i)=>`<button class="pb s${x}" data-a="cyc" data-n="${i}" aria-label="Numéro ${i+1}">${i+1}</button>`).join('')}</div>`;
+  else{const upto=it.s.lastIndexOf('2')+1;body=`<label class="f">J'ai lu jusqu'à la page <b class="num" style="color:var(--ink);font-size:20px" id="pg-out">${upto} / ${it.n}</b><input type="range" id="pg-range" min="0" max="${it.n}" value="${upto}" data-ch="pages" style="width:100%;accent-color:var(--pen)"></label><div class="row wrapr"><button class="btn sm" data-a="allset" data-v="2">Tout maîtrisé</button><button class="btn sm" data-a="allset" data-v="1">Tout à revoir</button><button class="btn sm ghost" data-a="allset" data-v="0">Remettre à zéro</button></div>`}
+  return `<div class="row between"><h2 class="grow" style="overflow-wrap:anywhere">${esc(it.name)}</h2><span class="pill num">${pct(itemProg(it))}</span></div>
+  ${body}
+  <div class="row wrapr"><label class="f grow">Suivi<select id="it-mode" data-ch="imode"><option value="p" ${it.mode==='p'?'selected':''}>Par pages</option><option value="l" ${it.mode==='l'?'selected':''}>Par exercices numérotés</option></select></label><label class="f" style="width:130px">${it.mode==='l'?'Nb d\'exercices':'Nb de pages'}<input type="number" id="it-n" min="1" max="2000" value="${it.n}" data-ch="in"></label></div>
+  <label class="f">Dossier<select id="it-cat" data-ch="icat">${CAT_ORDER.map(k=>`<option value="${k}" ${k===it.t?'selected':''}>${CATS[k]}</option>`).join('')}</select></label>
+  <label class="row small" style="font-weight:600"><input type="checkbox" id="it-skip" data-ch="iskip" ${it.skip?'checked':''} style="width:20px;height:20px;min-height:0;accent-color:var(--ink)"> Ne compte pas dans la progression (corrigé, annexe…)</label>
+  <div class="row"><button class="btn danger sm" data-a="delitem">Supprimer</button><button class="btn pri grow" data-a="close">OK</button></div>`;
+}
+function mPlanDay(){const sel=T.pd||[];return `<p class="mute small" style="margin:0">${cap(fmtDay(T.pdate))}</p><h2>Qu'est-ce que tu étudies ce jour-là ?</h2><div class="row wrapr">${courses().map(c=>`<button class="chip" style="--cc:${c.color}" data-a="pdtog" data-c="${c.id}" aria-pressed="${sel.includes(c.id)}"><span class="dot"></span>${esc(c.name)}</button>`).join('')||'<span class="mute small">Ajoute d\'abord un cours.</span>'}</div><div class="row"><button class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow" data-a="pdok">Enregistrer</button></div>`}
+function mAddCourse(){return `<h2>Nouveau cours</h2><form data-f="addcourse" style="display:flex;flex-direction:column;gap:12px"><label class="f">Nom<input type="text" id="nc-name" required placeholder="Ex. Statistique" autocomplete="off"></label><label class="f">Date de l'examen (facultatif)<input type="date" id="nc-exam"></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Créer</button></div></form>`}
+function mAddItem(){return `<h2>Ajouter dans ${CATS[T.at]}</h2><form data-f="additem" style="display:flex;flex-direction:column;gap:12px"><label class="f">Nom<input type="text" id="ni-name" required placeholder="${T.at==='exo'?'Ex. Séance 3':'Ex. Chapitre 2'}" autocomplete="off"></label><label class="f">${T.at==='exo'?'Nombre d\'exercices':'Nombre de pages'}<input type="number" id="ni-n" min="1" max="2000" value="1"></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Ajouter</button></div></form>`}
+function mRestore(){return `<h2>Restaurer une sauvegarde</h2><p class="small mute" style="margin:0">Colle ici le texte copié avec « Copier une sauvegarde ». Il remplace toutes les données actuelles.</p><textarea id="rs-text" rows="6" aria-label="Sauvegarde"></textarea><div class="row"><button class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow" data-a="dorestore">Restaurer</button></div>`}
+
+/* ---------- actions ---------- */
+const curItem=()=>{const c=S.courses[T.ic];return c&&c.items.find(i=>i.id===T.ii)};
+const dayOf=()=>S.main.days[TODAY()]=S.main.days[TODAY()]||{};
+function setParts(c,it,parts,v){const a=[...it.s];parts.forEach(p=>{if(p>=1&&p<=it.n)a[p-1]=v});it.s=a.join('')}
+function newCourse(name,exam,demo){const id=uid(),n=Object.keys(S.courses).length;S.courses[id]={id,name,exam:exam||'',color:COLORS[n%COLORS.length],items:[]};if(demo)S.courses[id].demo=1;return S.courses[id]}
+const A={
+  tab(el){V.tab=el.dataset.t;V.course=null;try{history.replaceState(null,'','#'+V.tab)}catch(e){location.hash=V.tab}render();$('#view').scrollTop=0},
+  close(){closeModal()},
+  confirm(){const f=M&&M.ok;M=null;if(f)f();else refresh()},
+  checkin(){T.ck=(S.main.plan[TODAY()]||[]).filter(id=>S.courses[id]);if(!T.ck.length)T.ck=suggestToday();T.ckTodos=[];openModal(mCheckin)},
+  cktog(el){const id=el.dataset.c;T.ck=T.ck.includes(id)?T.ck.filter(x=>x!==id):[...T.ck,id];refresh()},
+  ckskip(){ckSkipped=true;closeModal()},
+  ckok(){const t=TODAY();S.main.plan[t]=T.ck.slice();const d=dayOf();d.ck=1;(T.ckTodos||[]).forEach(x=>S.main.todos.push({id:uid(),text:x,d:t,done:0}));M=null;ensureDay();commit('main');toast(T.ck.length?'Programme du jour prêt. Bon courage !':'Journée notée.')},
+  start(){if(!Object.keys(S.courses).length){A.startc({dataset:{c:''}});return}openModal(mPickCourse)},
+  startc(el){S.main.timer={c:el.dataset.c||'',t0:Date.now(),acc:0};S.main.brk=null;M=null;commit('main')},
+  stop(){const t=S.main.timer;if(!t)return;if(t.t0){t.acc=(t.acc||0)+Date.now()-t.t0;t.t0=null}T.bmanual=false;T.bc=t.c;T.bmin=Math.max(1,Math.round(t.acc/60000));T.bnote='';stamp('main');saveLocal();openModal(mBilan)},
+  manual(){T.bmanual=true;T.bc=((S.main.plan[TODAY()]||[])[0])||'';T.bmin=30;T.bnote='';openModal(mBilan)},
+  discard(){S.main.timer=null;M=null;commit('main');toast('Session non comptée.')},
+  savesession(){const min=Math.max(1,Math.min(900,parseInt(T.bmin)||0));if(!T.bmanual)S.main.timer=null;S.log.sessions.push({id:uid(),d:TODAY(),c:T.bc||'',min,at:Date.now(),note:(T.bnote||'').slice(0,300)});M=null;commit('main','log');toast('+'+min+' points. Total du jour : '+fmtDur(minOn(TODAY())))},
+  brkopen(){openModal(mBreak)},
+  brk(el){const m=+el.dataset.m,t=S.main.timer;if(t&&t.t0){t.acc=(t.acc||0)+Date.now()-t.t0;t.t0=null}const d=dayOf();d.br=d.br||[];d.br.push({at:nowMin(),min:m});S.main.brk={until:Date.now()+m*60000,min:m,at:Date.now()};M=null;commit('main');toast('Pause de '+m+' min. Horaire décalé.')},
+  resume(){const b=S.main.brk,t=S.main.timer;if(b){const real=Math.max(1,Math.ceil((Date.now()-b.at)/60000)),br=dayOf().br;if(br&&br.length&&real<b.min)br[br.length-1].min=real}S.main.brk=null;if(t&&!t.t0)t.t0=Date.now();commit('main')},
+  mark(el){const c=S.courses[el.dataset.c],it=c&&c.items.find(i=>i.id===el.dataset.i);if(!it)return;setParts(c,it,el.dataset.p.split(',').map(Number),el.dataset.v);commit('c_'+c.id);toast(el.dataset.v==='2'?'Maîtrisé, bien joué.':'Noté. Ça reviendra en premier la prochaine fois.')},
+  more(el){const d=dayOf();d.extra=d.extra||{};d.extra[el.dataset.c]=(d.extra[el.dataset.c]||0)+1;commit('main');toast('Voilà la suite.')},
+  item(el){T.ic=el.dataset.c;T.ii=el.dataset.i;T.back=M&&M.fn===mBilan;openModal(mItem);if(T.back)M.back=mBilan},
+  set1(el){const it=curItem();if(!it)return;it.s=el.dataset.v;commit('c_'+T.ic)},
+  cyc(el){const it=curItem();if(!it)return;const i=+el.dataset.n,a=[...it.s];a[i]=a[i]==='0'?'2':a[i]==='2'?'1':'0';it.s=a.join('');commit('c_'+T.ic)},
+  allset(el){const it=curItem();if(!it)return;it.s=el.dataset.v.repeat(it.n);commit('c_'+T.ic)},
+  delitem(){const c=S.courses[T.ic];if(!c)return;c.items=c.items.filter(i=>i.id!==T.ii);M=null;commit('c_'+c.id)},
+  open(el){V.tab='cours';V.course=el.dataset.c;render();$('#view').scrollTop=0},
+  open2(el){M=null;A.open(el);refresh()},
+  backc(){V.course=null;render()},
+  addcourse(){openModal(mAddCourse)},
+  additem(el){T.ac=el.dataset.c;T.at=el.dataset.t;openModal(mAddItem)},
+  delcourse(el){const c=S.courses[el.dataset.c];if(!c)return;confirmBox('Supprimer « '+c.name+' » ?','Le cours et sa progression seront effacés. Le temps déjà étudié reste compté.','Supprimer',()=>{delete S.courses[c.id];for(const d in S.main.plan)S.main.plan[d]=S.main.plan[d].filter(x=>x!==c.id);V.course=null;commit('c_'+c.id,'main')})},
+  planday(el){T.pdate=el.dataset.d;T.pd=(S.main.plan[T.pdate]||[]).filter(id=>S.courses[id]);openModal(mPlanDay)},
+  pdtog(el){const id=el.dataset.c;T.pd=T.pd.includes(id)?T.pd.filter(x=>x!==id):[...T.pd,id];refresh()},
+  pdok(){if(T.pd.length)S.main.plan[T.pdate]=T.pd.slice();else delete S.main.plan[T.pdate];M=null;commit('main')},
+  autofill(){const n=autofill();commit('main');toast(n?n+' jour'+(n>1?'s':'')+' planifié'+(n>1?'s':'')+'.':'Aucun jour vide à remplir.')},
+  deltodo(el,e){e.preventDefault();S.main.todos=S.main.todos.filter(x=>x.id!==el.dataset.id);commit('main')},
+  claim(el){const r=S.main.rewards.find(x=>x.id===el.dataset.id);if(!r||points().avail<r.cost)return;S.main.spent=(S.main.spent||0)+r.cost;r.n=(r.n||0)+1;commit('main');toast('Profite bien : '+r.label+' !')},
+  delreward(el){S.main.rewards=S.main.rewards.filter(x=>x.id!==el.dataset.id);commit('main')},
+  addslot(){const l=S.main.slots[S.main.slots.length-1],s=l?hm2min(l.e)+30:480;S.main.slots.push({s:min2hm(s),e:min2hm(Math.min(1439,s+120))});commit('main')},
+  delslot(el){S.main.slots.splice(+el.dataset.i,1);commit('main')},
+  off(el){const d=+el.dataset.d;S.main.off=S.main.off.includes(d)?S.main.off.filter(x=>x!==d):[...S.main.off,d];commit('main')},
+  import(){$('#dirpick').value='';$('#dirpick').click()},
+  syncnow(){syncNow().then(()=>toast(syncState==='ok'?'Synchronisé.':'Synchronisation impossible pour l\'instant.'))},
+  syncoff(){cfg=null;try{localStorage.removeItem(CFG)}catch(e){}syncState='local';refresh();toast('Appareil déconnecté. Les données restent ici.')},
+  demo(){loadDemo();commit('main','log',...Object.keys(S.courses).map(k=>'c_'+k));toast('Exemple chargé.')},
+  cleardemo(){const ids=Object.values(S.courses).filter(c=>c.demo).map(c=>c.id);ids.forEach(id=>delete S.courses[id]);S.log.sessions=S.log.sessions.filter(s=>!s.demo);for(const d in S.main.plan){S.main.plan[d]=S.main.plan[d].filter(x=>!ids.includes(x));if(!S.main.plan[d].length)delete S.main.plan[d]}S.main.todos=S.main.todos.filter(t=>!t.demo);S.main.rewards=S.main.rewards.filter(r=>!r.demo);S.main.days={};commit('main','log',...ids.map(k=>'c_'+k))},
+  async backup(){try{await navigator.clipboard.writeText(JSON.stringify(S));toast('Sauvegarde copiée. Colle-la dans une note.')}catch(e){toast('Copie refusée par le navigateur.')}},
+  restore(){openModal(mRestore)},
+  dorestore(){try{const r=JSON.parse($('#rs-text').value);if(!r||!r.main)throw 0;const old=Object.keys(S.courses);S.main=fixMain(r.main);S.log=r.log&&Array.isArray(r.log.sessions)?r.log:{sessions:[]};S.courses={};for(const k in (r.courses||{}))S.courses[k]=fixCourse(r.courses[k]);M=null;commit('main','log',...old.map(k=>'c_'+k),...Object.keys(S.courses).map(k=>'c_'+k));toast('Sauvegarde restaurée.')}catch(e){toast('Ce texte n\'est pas une sauvegarde Smart Blocus.')}},
+  reset(){confirmBox('Tout effacer ?','Cours, planning, sessions et récompenses seront supprimés sur tous tes appareils reliés.','Tout effacer',()=>{const old=Object.keys(S.courses);S={main:blankMain(),log:{sessions:[]},courses:{}};V.course=null;commit('main','log',...old.map(k=>'c_'+k))})}
+};
+const C={
+  todo(el){const x=S.main.todos.find(t=>t.id===el.dataset.id);if(!x)return;x.done=el.checked?1:0;x.dd=el.checked?TODAY():'';commit('main')},
+  cname(el){const c=S.courses[V.course];if(c&&el.value.trim()){c.name=el.value.trim().slice(0,80);commit('c_'+c.id)}},
+  cexam(el){const c=S.courses[V.course];if(c){c.exam=el.value||'';commit('c_'+c.id)}},
+  ccolor(el){const c=S.courses[V.course];if(c){c.color=el.value;commit('c_'+c.id)}},
+  slot(el){const s=S.main.slots[+el.dataset.i];if(s&&el.value){s[el.dataset.k]=el.value;commit('main')}},
+  bcourse(el){T.bc=el.value;refresh()},
+  pages(el){const it=curItem();if(!it)return;const n=+el.value;it.s=[...it.s].map((x,i)=>i<n?(x==='1'?'1':'2'):'0').join('');commit('c_'+T.ic)},
+  imode(el){const it=curItem();if(it){it.mode=el.value;commit('c_'+T.ic)}},
+  in(el){const it=curItem();if(it){it.n=parseInt(el.value)||1;fixItem(it);commit('c_'+T.ic)}},
+  icat(el){const it=curItem();if(it){it.t=el.value;commit('c_'+T.ic)}},
+  iskip(el){const it=curItem();if(it){it.skip=el.checked?1:0;commit('c_'+T.ic)}}
+};
+const F={
+  async synclink(){const tk=$('#sy-token').value.trim();if(!tk)return;toast('Connexion à GitHub…');try{const found=await linkSync(tk);toast(found?'Appareil relié. Données récupérées.':'Synchronisation activée. Colle le même jeton sur tes autres appareils.')}catch(e){cfg=null;syncState='local';refresh();toast(e.status===401?'Jeton refusé. Vérifie qu\'il est complet.':e.status===403||e.status===404?'Ce jeton n\'a pas le droit « gist ».':'Connexion impossible. Vérifie internet.')}},
+  todo(){const i=$('#todo-in'),v=i.value.trim();if(!v)return;S.main.todos.push({id:uid(),text:v.slice(0,200),d:TODAY(),done:0});commit('main');const n=$('#todo-in');if(n)n.focus()},
+  cktodo(){const i=$('#ck-todo'),v=i.value.trim();if(!v)return;T.ckTodos.push(v.slice(0,200));refresh();const n=$('#ck-todo');if(n)n.focus()},
+  reward(){const l=$('#rw-label').value.trim(),c=parseInt($('#rw-cost').value);if(!l||!(c>0)){toast('Donne un nom et un nombre de points.');return}S.main.rewards.push({id:uid(),label:l.slice(0,80),cost:Math.min(100000,c),n:0});commit('main')},
+  addcourse(){const n=$('#nc-name').value.trim();if(!n)return;const c=newCourse(n.slice(0,80),$('#nc-exam').value);M=null;V.tab='cours';V.course=c.id;commit('c_'+c.id)},
+  additem(){const c=S.courses[T.ac],n=$('#ni-name').value.trim();if(!c||!n)return;c.items.push(fixItem({id:uid(),t:T.at,name:n.slice(0,160),key:'',n:$('#ni-n').value,s:'',skip:T.at==='aut'?1:0}));M=null;commit('c_'+c.id)}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;
+  if(el.dataset.a==='close'&&M&&M.back){const b=M.back;M={fn:b};refresh();return}
+  if(el.dataset.a==='close'&&M&&M.fn===mBilan&&!T.bmanual&&S.main.timer&&!S.main.timer.t0)S.main.timer.t0=Date.now();
+  const f=A[el.dataset.a];if(f)f(el,e)});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-ch]');if(el&&C[el.dataset.ch])C[el.dataset.ch](el)});
+document.addEventListener('input',e=>{const el=e.target;if(el.dataset&&el.dataset.tmp)T[el.dataset.tmp]=el.value;if(el.id==='pg-range'){const o=$('#pg-out');if(o)o.textContent=el.value+' / '+el.max}});
+document.addEventListener('submit',e=>{e.preventDefault();const f=e.target.dataset.f;if(f&&F[f])F[f]()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M)closeModal()});
+$('#dirpick').addEventListener('change',e=>importFiles(e.target.files));
+
+/* ---------- import des dossiers ---------- */
+function catOf(name){const n=norm(name);if(/^(synth|resume)/.test(n))return 'syn';if(/^(slide|dia|cours|theor|present|syllab)/.test(n))return 'sli';if(/^(exerc|exo|tp|td|seance|pratique|travaux)/.test(n))return 'exo';if(/^(autre|divers|other|annexe)/.test(n))return 'aut';return null}
+async function countParts(f){
+  const ext=(f.name.split('.').pop()||'').toLowerCase();if(!['pdf','pptx'].includes(ext)||f.size>60e6)return 1;
+  try{const txt=new TextDecoder('latin1').decode(await f.arrayBuffer());
+    if(ext==='pptx'){const s=new Set(txt.match(/ppt\/slides\/slide\d+\.xml/g)||[]);return s.size||1}
+    const m=txt.match(/\/Type\s*\/Page(?![a-zA-Z])/g);if(m&&m.length)return m.length;
+    let mx=0;for(const c of txt.matchAll(/\/Count\s+(\d+)/g))mx=Math.max(mx,+c[1]);return mx||1;
+  }catch(e){return 1}
+}
+async function importFiles(list){
+  const files=[...list].filter(f=>{const p=f.webkitRelativePath||f.name;return !p.split('/').some(s=>s.startsWith('.')||s.startsWith('~$'))});
+  if(!files.length)return;
+  if(!files.some(f=>(f.webkitRelativePath||'').includes('/'))){toast('Cet appareil ne permet pas de choisir un dossier. Fais l\'import depuis ton Mac : tes cours apparaîtront ici.');return}
+  const P=files.map(f=>({f,p:f.webkitRelativePath.split('/')}));
+  const a=P.filter(x=>x.p.length>=3&&catOf(x.p[1])).length,b=P.filter(x=>x.p.length>=4&&catOf(x.p[2])).length;
+  const rootIsCourse=a>b;let nc=0,nf=0,done=0;const touched=new Set();
+  for(const x of P){
+    done++;if(done%5===0)toast('Analyse des fichiers… '+done+' / '+P.length);
+    const p=x.p;let cname,cat,rest;
+    if(rootIsCourse){cname=p[0];if(p.length===2){cat='aut';rest=p.slice(1)}else{cat=catOf(p[1]);rest=cat?p.slice(2):p.slice(1);cat=cat||'aut'}}
+    else{if(p.length<3)continue;cname=p[1];if(p.length===3){cat='aut';rest=p.slice(2)}else{cat=catOf(p[2]);rest=cat?p.slice(3):p.slice(2);cat=cat||'aut'}}
+    if(!rest.length)continue;
+    let c=Object.values(S.courses).find(k=>norm(k.name)===norm(cname)&&!k.demo);if(!c){c=newCourse(cname.slice(0,80),'');nc++}
+    const key=cat+'/'+rest.join('/');if(c.items.some(i=>i.key===key))continue;
+    const name=rest.join(' / ').replace(/\.[a-z0-9]{1,5}$/i,'');
+    const ref=/corrig|solution|resol|correction|reponse/.test(norm(name));
+    const n=cat==='exo'?1:await countParts(x.f);
+    c.items.push(fixItem({id:uid(),t:cat,name:name.slice(0,160),key,n,s:'',skip:(cat==='aut'||ref)?1:0}));nf++;touched.add('c_'+c.id);
+  }
+  if(!nf){toast('Rien de nouveau à importer.');return}
+  V.tab='cours';V.course=null;commit(...touched);
+  toast(nf+' fichier'+(nf>1?'s':'')+' importé'+(nf>1?'s':'')+(nc?' dans '+nc+' nouveau'+(nc>1?'x':'')+' cours':'')+'. Indique le nombre d\'exercices dans chaque fichier d\'exercices.');
+}
+
+/* ---------- exemple ---------- */
+function loadDemo(){
+  const t=TODAY(),mk=(t2,name,n,s,skip)=>fixItem({id:uid(),t:t2,name,key:'',n,s:s||'',skip:skip?1:0});
+  const a=newCourse('Mathématiques générales',addDays(t,12),1);a.items=[mk('syn','Synthèse complète',38,'2'.repeat(14)),mk('sli','Chapitre 1 – Limites',42,'2'.repeat(42)),mk('sli','Chapitre 2 – Dérivées',56,'2'.repeat(20)),mk('sli','Chapitre 3 – Intégrales',61),mk('exo','Séance 1',12,'222122222222'),mk('exo','Séance 2',15,'2212'),mk('exo','Séance 3',18),mk('exo','Corrigés',1,'',1)];
+  const b=newCourse('Microéconomie',addDays(t,17),1);b.items=[mk('syn','Résumé du cours',24,'2'.repeat(6)),mk('sli','Partie 1 – Consommateur',70,'2'.repeat(35)),mk('sli','Partie 2 – Producteur',64),mk('exo','TP 1 à 4',20,'22221')];
+  const c=newCourse('Droit des obligations',addDays(t,22),1);c.items=[mk('syn','Synthèse',52,'2'.repeat(10)),mk('sli','Slides du cours',120,'2'.repeat(18)),mk('exo','Cas pratiques',10,'21')];
+  S.main.plan[t]=[a.id,b.id];
+  for(let i=1;i<=5;i++)S.log.sessions.push({id:uid(),d:addDays(t,-i),c:i%2?a.id:b.id,min:[210,325,150,290,260][i-1],at:Date.now()-i*864e5,note:'',demo:1});
+  S.main.todos.push({id:uid(),text:'Imprimer le formulaire de maths',d:t,done:0,demo:1},{id:uid(),text:'Demander les notes du cours 7',d:addDays(t,-1),done:0,demo:1});
+  S.main.rewards.push({id:uid(),label:'Un épisode de série',cost:120,n:0,demo:1},{id:uid(),label:'Soirée entre amis',cost:600,n:0,demo:1});
+  autofill();
+}
+
+/* ---------- démarrage ---------- */
+loadLocal();
+{const h=(location.hash||'').slice(1);if(TABS.some(t=>t[0]===h))V.tab=h}
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)&&h!==V.tab){V.tab=h;V.course=null;render()}});
+refresh();syncNow();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
+window.addEventListener('online',()=>syncNow());
+setInterval(()=>{if(!document.hidden)syncNow()},45000);
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+setInterval(()=>{
+  const t=$('[data-live="timer"]');if(t)t.textContent=fmtClock(timerMs());
+  const m=$('[data-live="mt"]');if(m)m.textContent=fmtDur(minToday());
+  const b=$('[data-live="brk"]'),bk=S.main.brk;if(b&&bk){const left=bk.until-Date.now();b.textContent=left>0?fmtClock(left):'00:00';if(left<=0){const g=$('[data-live="brkmsg"]');if(g)g.textContent='La pause est finie. On s\'y remet ?'}}
+},1000);
+let lastDay=TODAY();setInterval(()=>{if(TODAY()!==lastDay){lastDay=TODAY();ckSkipped=false;refresh()}},60000);
+</script>
+</body>
+</html>
