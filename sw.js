@@ -14,7 +14,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   // Seules les polices viennent d'ailleurs : jamais les données (Supabase, GitHub…), toujours en direct.
-  if (!/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname)) return;
+  if (!/fonts\.(googleapis|gstatic)\.com$/.test(u.hostname) && u.hostname !== 'cdn.jsdelivr.net') return;
   e.respondWith(caches.open(CACHE).then(async c => {
     const hit = await c.match(req);
     const net = fetch(req).then(r => { if (r && (r.ok || r.type === 'opaque')) c.put(req, r.clone()); return r; }).catch(() => hit);
