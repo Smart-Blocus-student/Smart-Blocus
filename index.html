@@ -108,6 +108,20 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13.5px;font-weight:
 .stat{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat b{font:800 24px/1.1 var(--display)}
 .stat span{font-size:12.5px;color:var(--mute);font-weight:600}
+button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer;transition:transform .12s,box-shadow .12s}
+button.stat:hover,button.stat:focus-visible{box-shadow:3px 3px 0 var(--ink);transform:translate(-1px,-1px)}
+button.stat i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--pen);margin-top:2px}
+.sheet>.seg,.sheet>.dlist,.sheet>.avg,.sheet>.dleg{flex:none}
+.dlist{display:flex;flex-direction:column;gap:2px}
+.dleg{font-size:12px;color:var(--mute);margin:-6px 0 0;display:flex;align-items:center;gap:6px}.dleg i{width:0;height:12px;border-left:2px dashed var(--ink)}
+.drow{display:grid;grid-template-columns:92px 1fr 70px;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+.drow:last-child{border:0}.drow.off{opacity:.55}.drow.t b{background:linear-gradient(transparent 55%,var(--hl) 55%)}
+.drow .dl{font-size:13.5px;line-height:1.15;text-transform:capitalize}.drow .dl small{display:block;color:var(--mute);text-transform:none}
+.drow .db{height:12px;background:var(--soft);border-radius:6px;position:relative}.drow .db em{position:absolute;top:-3px;bottom:-3px;border-left:2px dashed var(--ink);opacity:.7}.drow .db span{display:block;height:100%;background:var(--pen);border-radius:6px}
+.drow .dv{text-align:right;font-weight:700;font-size:14px}
+.drow .dc{grid-column:2/4;font-size:12px;color:var(--mute);margin-top:-4px}
+.avg{display:grid;grid-template-columns:1fr 1fr;gap:8px}.avg div{background:var(--soft);border-radius:12px;padding:10px 12px}.avg b{display:block;font:800 22px/1.1 var(--display)}.avg span{font-size:12px;color:var(--mute);font-weight:600}
+.chartbtn{all:unset;display:block;cursor:pointer;width:100%}
 .timer{font:800 52px/1 var(--display);letter-spacing:-.02em}
 .slot{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;border:1.5px solid var(--line);font-size:14.5px}
 .slot.now{border-color:var(--ink);background:var(--soft)}
@@ -438,7 +452,8 @@ function dayTasks(c){
   return {tasks,manual:true,left:0,hasNew:tasks.some(t=>t.kind!=='done')};
 }
 function ranges(a){const o=[];let i=0;while(i<a.length){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;o.push(j>i?a[i]+'–'+a[j]:''+a[i]);i=j+1}return o.join(', ')}
-function taskLabel(t){const it=t.it,r=it.n===1?'':ranges(t.parts),u=it.mode==='l'?'n° ':'p. ';
+function taskLabel(t){const it=t.it,r=it.n===1?'':ranges(t.parts),u=it.qz?'mots ':it.mode==='l'?'n° ':'p. ';
+  if(it.qz&&t.kind!=='done')return it.n===1?(t.kind==='redo'?'Quizlet · à revoir':'Quizlet · réviser le set'):(t.kind==='redo'?'Quizlet · revoir mots ':'Quizlet · mots ')+r;
   if(t.kind==='done')return (t.e.done==='1'?'Fait, à revoir':'Maîtrisé')+(r?' · '+u+r:'');
   if(it.n===1)return t.kind==='redo'?'À revoir : pas encore maîtrisé':(it.mode==='l'?'À faire':'À étudier');
   if(it.mode==='l')return (t.kind==='redo'?'Refaire n° ':'Faire n° ')+r;return (t.kind==='redo'?'Revoir p. ':'Lire p. ')+r}
@@ -460,7 +475,7 @@ function points(){
   let time=0,goals=0;for(const d in by){time+=by[d];const g=isOff(d)?0:goalMin();if(g&&by[d]>=g*.75)goals++}
   let prog=0,cards=0;
   for(const c of Object.values(S.courses)){
-    for(const it of c.items){if(it.skip||gOf(c,it)==='x')continue;const w=it.n===1?5:it.mode==='l'?3:1;for(const ch of it.s){if(ch==='2')prog+=w;else if(ch==='1')prog+=w/2}}
+    for(const it of c.items){if(it.skip||gOf(c,it)==='x')continue;const w=it.n===1?5:it.qz?1:it.mode==='l'?3:1;for(const ch of it.s){if(ch==='2')prog+=w;else if(ch==='1')prog+=w/2}}
     for(const a of (c.annexes||[]))if(a.type==='deck')for(const x of a.cards)cards+=(+x.r||0);
   }
   const parts={time:Math.floor(time),prog:Math.floor(prog),cards,tasks:todoCount()*15,goals:goals*100};
@@ -500,6 +515,7 @@ function taskRows(c){
     if(t.e&&t.e.txt!=null){h+=`<div class="task ${t.kind}"><button class="tmain" data-a="ptxt" data-c="${c.id}" data-k="${t.e.id}" style="flex-direction:row;align-items:center;gap:10px"><span class="tick" aria-hidden="true">${t.e.done?I.check:''}</span><span class="tname grow">${esc(t.e.txt)}</span></button></div>`;continue}
     const k=t.e?` data-k="${t.e.id}"`:'';
     h+=`<div class="task ${t.kind}"><button class="tmain" data-a="item" data-c="${c.id}" data-i="${t.it.id}"><span class="tname">${esc(t.it.name)}</span><span class="tlab">${esc(secName(c,t.it.t))} · ${esc(taskLabel(t))}</span></button>`;
+    if(t.it.qz)h+=`<button class="qb" data-a="qzopen" data-c="${c.id}" data-i="${t.it.id}" aria-label="Ouvrir dans Quizlet" title="Ouvrir dans Quizlet" style="color:var(--pen);border-color:var(--pen)">${I.play}</button>`;
     if(t.kind==='done')h+=`<button class="qb" data-a="undone" data-c="${c.id}" data-k="${t.e.id}" aria-label="Remettre à faire" title="Remettre à faire">${I.redo}</button>`;
     else{h+=`<button class="qb ok" data-a="mark" data-c="${c.id}" data-i="${t.it.id}" data-p="${t.parts.join(',')}" data-v="2"${k} aria-label="Maîtrisé" title="Maîtrisé">${I.check}</button>`;
       if(t.kind==='new')h+=`<button class="qb re" data-a="mark" data-c="${c.id}" data-i="${t.it.id}" data-p="${t.parts.join(',')}" data-v="1"${k} aria-label="Fait, à revoir" title="Fait, à revoir">${I.redo}</button>`}
@@ -578,7 +594,7 @@ function viewToday(){
     return h+`<section class="card"><h2>Commence par tes cours</h2><p style="margin:0">Sur ton Mac, choisis ou glisse sur cette fenêtre le dossier qui contient tes cours. Chaque sous-dossier d'un cours devient une section : <b>Synthèse</b>, <b>Slides</b>, <b>Exercices</b>, ou pour une langue <b>Vocabulaire</b>, <b>Grammaire</b>… Tu vérifies tout avant l'import.</p>
     <div class="row wrapr">${dirBtn('btn acc','Importer mes dossiers')}<button class="btn" data-a="addcourse">${I.plus}Ajouter un cours à la main</button><button class="btn ghost" data-a="demo">Voir un exemple</button></div></section></div>`;
   }
-  h+=`<div class="stats"><div class="stat"><b class="num" data-live="mt">${fmtDur(mt)}</b><span>étudié aujourd'hui${goal?' sur '+fmtDur(goal):''}</span></div><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.avail}</b><span>points à dépenser</span></div></div>`;
+  h+=`<div class="stats"><button class="stat" data-a="days" aria-label="Voir le temps étudié chaque jour"><b class="num" data-live="mt">${fmtDur(mt)}</b><span>étudié aujourd'hui${goal?' sur '+fmtDur(goal):''}</span><i>Détail par jour ›</i></button><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.avail}</b><span>points à dépenser</span></div></div>`;
   h+=`<div class="cols"><div class="col">`;
   if(!ids.length){h+=`<section class="card"><h2>Qu'est-ce que tu travailles aujourd'hui ?</h2><p class="mute small" style="margin:0">Choisis tes cours du jour pour recevoir ton programme.</p><button class="btn acc" data-a="checkin" style="align-self:flex-start">Choisir mes cours</button></section>`}
   else{
@@ -615,8 +631,8 @@ function viewCourse(c){
   if(!c.sections.length)h+=`<section class="card flat"><p style="margin:0">Ce cours n'a pas encore de section. Crée-en une, par exemple « Vocabulaire » ou « Chapitres ».</p></section>`;
   for(const sec of c.sections){
     const its=c.items.filter(i=>i.t===sec.id).sort((a,b)=>natural(a.name,b.name));
-    h+=`<section class="card flat"><div class="row between wrapr"><div class="row grow" style="min-width:150px;flex-wrap:wrap"><h2>${esc(sec.name)}</h2><span class="pill">${GLAB[sec.g]||''}</span></div><div class="row">${fileBtn(c.id,sec.id,'btn sm','Fichiers')}<button class="btn sm ghost" data-a="additem" data-c="${c.id}" data-t="${sec.id}">À la main</button><button class="btn sm ghost" data-a="secedit" data-c="${c.id}" data-s="${sec.id}">Modifier</button></div></div><div>`;
-    h+=its.length?its.map(it=>`<button class="item ${it.skip?'skip':''}" data-a="item" data-c="${c.id}" data-i="${it.id}"><span class="nm">${esc(it.name)}<br><span class="small mute">${it.skip||sec.g==='x'?'Ne compte pas':it.n>1?(it.mode==='l'?it.n+' éléments numérotés':it.n+' pages'):(it.mode==='l'?'<span style="color:var(--warn)">Touche pour indiquer le nombre d\'éléments</span>':'1 bloc')}</span></span><span class="mini">${it.skip?'':bar(itemProg(it),c.color)}</span><span class="small num" style="width:44px;text-align:right">${it.skip?'–':pct(itemProg(it))}</span></button>`).join(''):`<p class="mute small" style="margin:0">Aucun fichier.</p>`;
+    h+=`<section class="card flat"><div class="row between wrapr"><div class="row grow" style="min-width:150px;flex-wrap:wrap"><h2>${esc(sec.name)}</h2><span class="pill">${GLAB[sec.g]||''}</span></div><div class="row">${fileBtn(c.id,sec.id,'btn sm','Fichiers')}<button class="btn sm" data-a="qzadd" data-c="${c.id}" data-s="${sec.id}">${I.plus}Quizlet</button><button class="btn sm ghost" data-a="additem" data-c="${c.id}" data-t="${sec.id}">À la main</button><button class="btn sm ghost" data-a="secedit" data-c="${c.id}" data-s="${sec.id}">Modifier</button></div></div><div>`;
+    h+=its.length?its.map(it=>`<button class="item ${it.skip?'skip':''}" data-a="item" data-c="${c.id}" data-i="${it.id}"><span class="nm">${esc(it.name)}<br><span class="small mute">${it.qz?'Quizlet · ':''}${it.skip||sec.g==='x'?'Ne compte pas':it.qz?(it.n>1?it.n+' mots':'<span style="color:var(--warn)">Touche pour indiquer le nombre de mots</span>'):it.n>1?(it.mode==='l'?it.n+' éléments numérotés':it.n+' pages'):(it.mode==='l'?'<span style="color:var(--warn)">Touche pour indiquer le nombre d\'éléments</span>':'1 bloc')}</span></span><span class="mini">${it.skip?'':bar(itemProg(it),c.color)}</span><span class="small num" style="width:44px;text-align:right">${it.skip?'–':pct(itemProg(it))}</span></button>`).join(''):`<p class="mute small" style="margin:0">Aucun fichier.</p>`;
     h+=`</div></section>`;
   }
   h+=`<section class="card flat"><div class="row between wrapr"><div class="row grow" style="min-width:150px;flex-wrap:wrap"><h2>Annexes</h2><span class="pill">Quizlet, flashcards, vidéos, liens</span></div><button class="btn sm" data-a="annexadd" data-c="${c.id}">${I.plus}Ajouter</button></div><div>${(c.annexes||[]).length?c.annexes.map(a=>annexRow(c,a)).join(''):'<p class="mute small" style="margin:0">Ajoute un set Quizlet, des flashcards, une vidéo YouTube ou un lien utile (Moodle, Teams, Drive…).</p>'}</div></section>`;
@@ -636,8 +652,8 @@ function viewProgress(){
   const pts=points(),cs=courses(),t=TODAY(),lvl=Math.floor(pts.total/300)+1,into=pts.total%300;
   const days=[];for(let i=13;i>=0;i--)days.push(addDays(t,-i));const vals=days.map(minOn),mx=Math.max(60,...vals);
   let h=`<div class="wrap"><header><h1>Ma <span class="hl">progression</span></h1></header>
-  <div class="stats"><div class="stat"><b class="num">${fmtDur(pts.mins)}</b><span>étudié au total</span></div><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.goals}</b><span>objectifs journaliers atteints (75 % de ton horaire)</span></div></div>
-  <div class="cols"><div class="col"><section class="card flat"><h2>Heures par jour</h2><div class="chart" role="img" aria-label="Temps étudié sur 14 jours">${vals.map((v,i)=>`<div class="${days[i]===t?'t':''}" style="height:${Math.round(v/mx*100)}%" title="${fmtDay(days[i],{day:'numeric',month:'short'})} : ${fmtDur(v)}"></div>`).join('')}</div><div class="chartx">${days.map((d,i)=>`<span>${i%2?'':parseD(d).getDate()}</span>`).join('')}</div><p class="small mute" style="margin:0">14 derniers jours. Le plus haut : ${fmtDur(Math.max(...vals))}.</p></section>
+  <div class="stats"><button class="stat" data-a="days" aria-label="Voir le temps étudié chaque jour"><b class="num">${fmtDur(pts.mins)}</b><span>étudié au total</span><i>Détail par jour ›</i></button><div class="stat"><b class="num">${streak()} j</b><span>d'affilée</span></div><div class="stat"><b class="num">${pts.goals}</b><span>objectifs journaliers atteints (75 % de ton horaire)</span></div></div>
+  <div class="cols"><div class="col"><section class="card flat"><h2>Heures par jour</h2><button class="chartbtn" data-a="days" aria-label="Voir le détail jour par jour"><div class="chart" role="img" aria-label="Temps étudié sur 14 jours">${vals.map((v,i)=>`<div class="${days[i]===t?'t':''}" style="height:${Math.round(v/mx*100)}%" title="${fmtDay(days[i],{day:'numeric',month:'short'})} : ${fmtDur(v)}"></div>`).join('')}</div><div class="chartx">${days.map((d,i)=>`<span>${i%2?'':parseD(d).getDate()}</span>`).join('')}</div></button><p class="small mute" style="margin:0">14 derniers jours. Moyenne : ${fmtDur(vals.reduce((a,b)=>a+b,0)/14)} par jour. <button class="lnk" data-a="days" style="all:unset;cursor:pointer;color:var(--pen);font-weight:700">Voir chaque jour ›</button></p></section>
   <section class="card flat"><h2>Avancement par cours</h2>${cs.length?cs.map(c=>{const p=cProg(c);return `<div><div class="row between small"><b>${esc(c.name)}</b><span class="num">${pct(p)}</span></div>${bar(p,c.color)}</div>`}).join(''):'<p class="mute small" style="margin:0">Ajoute un cours pour voir ta progression.</p>'}</section></div>
   <div class="col"><section class="card"><div class="row between"><h2>Niveau ${lvl}</h2><span class="pill num">${pts.total} points gagnés</span></div>${bar(into/300,'var(--good)')}<p class="small mute" style="margin:0">Encore ${300-into} points avant le niveau ${lvl+1}.</p>
   <div class="small" style="display:flex;flex-direction:column;gap:4px">${[['Temps d\'étude (1 pt par minute)',pts.parts.time],['Matière maîtrisée (1 pt par page, 3 par exercice)',pts.parts.prog],['Flashcards (1 pt par carte révisée)',pts.parts.cards],['Tâches cochées (15 pts)',pts.parts.tasks],['Objectifs journaliers (100 pts)',pts.parts.goals]].map(x=>`<div class="row between"><span class="mute">${x[0]}</span><b class="num">${x[1]}</b></div>`).join('')}${S.main.spent?`<div class="row between"><span class="mute">Dépensés en récompenses</span><b class="num">−${S.main.spent}</b></div>`:''}</div></section>
@@ -706,6 +722,19 @@ function snap(...ids){const o={};ids.forEach(id=>{const d=docData(id);o[id]=d?cl
 function confirmBox(title,text,ok,fn){openModal(()=>`<h2>${esc(title)}</h2><p style="margin:0">${esc(text)}</p><div class="row"><button class="btn grow" data-a="close">Annuler</button><button class="btn danger grow" data-a="confirm">${esc(ok)}</button></div>`);M.ok=fn}
 
 /* ---------- modales ---------- */
+function mDays(){
+  const t=TODAY(),per=T.dper||14,ss=S.log.sessions;
+  const first=ss.length?ss.reduce((a,x)=>x.d<a?x.d:a,t):t;
+  const n=per==='all'?Math.min(366,daysBetween(first,t)+1):per;
+  const days=[];for(let i=0;i<n;i++)days.push(addDays(t,-i));
+  const val=d=>d===t?minToday():minOn(d),vals=days.map(val),mx=Math.max(30,...vals);
+  const tot=vals.reduce((a,b)=>a+b,0),worked=vals.filter(v=>v>0).length,best=Math.max(...vals);
+  const bestD=days[vals.indexOf(best)];
+  const byCourse=d=>{const o={};ss.forEach(x=>{if(x.d===d){const k=x.c&&S.courses[x.c]?x.c:'';o[k]=(o[k]||0)+x.min}});return Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,m])=>(k?esc(S.courses[k].name):'Étude libre')+' '+fmtDur(m)).join(' · ')};
+  let h=`<h2>Temps étudié <span class="hl">par jour</span></h2><div class="seg">${[[7,'7 jours'],[14,'14 jours'],[30,'30 jours'],['all','Tout']].map(([k,l])=>`<button type="button" data-a="dper" data-n="${k}" aria-pressed="${per===k}">${l}</button>`).join('')}</div><p class="dleg"><i></i>ta moyenne : ${fmtDur(tot/n)} par jour</p><div class="dlist">`;
+  h+=days.map((d,i)=>{const v=vals[i],bc=byCourse(d);return `<div class="drow ${d===t?'t':''} ${!v&&isOff(d)?'off':''}"><span class="dl"><b>${d===t?'Aujourd\'hui':i===1?'Hier':fmtDay(d,{weekday:'short',day:'numeric'})}</b><small>${fmtDay(d,{day:'numeric',month:'short'})}${!v&&isOff(d)?' · repos':''}</small></span><span class="db"><span style="width:${v?Math.max(3,Math.round(v/mx*100)):0}%"></span><em style="left:${Math.round(tot/n/mx*100)}%"></em></span><span class="dv num">${v?fmtDur(v):'–'}</span>${bc?`<span class="dc">${bc}</span>`:''}</div>`}).join('');
+  h+=`</div><div class="avg"><div><b class="num">${fmtDur(tot/n)}</b><span>en moyenne par jour</span></div><div><b class="num">${worked?fmtDur(tot/worked):'–'}</b><span>en moyenne les jours où tu as étudié (${worked} j)</span></div><div><b class="num">${fmtDur(tot)}</b><span>au total sur la période</span></div><div><b class="num">${best?fmtDur(best):'–'}</b><span>record${best?' · '+fmtDay(bestD,{day:'numeric',month:'short'}):''}</span></div></div><button class="btn pri" data-a="close">Fermer</button>`;
+  return h}
 function mCheckin(){
   const h=new Date().getHours(),sel=T.ck||[];let redo='';
   for(const c of courses()){const n=c.items.filter(i=>!i.skip).reduce((a,i)=>a+[...i.s].filter(x=>x==='1').length,0);if(n)redo+=`<li><b>${esc(c.name)}</b> : ${n} point${n>1?'s':''} à revoir</li>`}
@@ -738,9 +767,10 @@ function mItem(){
   else{const upto=it.s.lastIndexOf('2')+1;body=`<label class="f">J'ai lu jusqu'à la page <b class="num" style="color:var(--ink);font-size:20px" id="pg-out">${upto} / ${it.n}</b><input type="range" id="pg-range" min="0" max="${it.n}" value="${upto}" data-ch="pages" style="width:100%;accent-color:var(--pen)"></label><div class="row wrapr"><button class="btn sm" data-a="allset" data-v="2">Tout maîtrisé</button><button class="btn sm" data-a="allset" data-v="1">Tout à revoir</button><button class="btn sm ghost" data-a="allset" data-v="0">Remettre à zéro</button></div>`}
   const dc=T.doc&&T.doc.id===it.id&&!T.doc.loading?T.doc:null;
   return `<div class="row between"><h2 class="grow" style="overflow-wrap:anywhere">${esc(it.name)}</h2><span class="pill num">${pct(itemProg(it))}</span></div>
-  ${dc?(dc.has?`<button class="btn acc" data-a="opendoc" style="align-self:flex-start">${I.book}Ouvrir le document</button>`:`<div class="row wrapr small"><span class="mute grow">Le document n'est pas enregistré sur cet appareil.</span><label for="filepick" class="btn sm" data-a="pickattach" data-i="${it.id}" role="button" tabindex="0">${I.folder}Ajouter le fichier</label></div>`):''}
+  ${it.qz?`<div class="row wrapr"><button class="btn acc" data-a="qzopen" data-c="${c.id}" data-i="${it.id}">${I.play}Ouvrir dans Quizlet</button><label class="f" style="min-width:150px">Mode<select id="it-qzmode" data-ch="qzmodeitem" data-c="${c.id}" data-i="${it.id}">${QZ_MODES.map(m=>`<option value="${m[0]}" ${m[0]===(it.qmode||'flashcards')?'selected':''}>${m[1]}</option>`).join('')}</select></label></div>`:''}
+  ${!it.qz&&dc?(dc.has?`<button class="btn acc" data-a="opendoc" style="align-self:flex-start">${I.book}Ouvrir le document</button>`:`<div class="row wrapr small"><span class="mute grow">Le document n'est pas enregistré sur cet appareil.</span><label for="filepick" class="btn sm" data-a="pickattach" data-i="${it.id}" role="button" tabindex="0">${I.folder}Ajouter le fichier</label></div>`):''}
   ${body}
-  <div class="row wrapr"><label class="f grow">Suivi<select id="it-mode" data-ch="imode"><option value="p" ${it.mode==='p'?'selected':''}>Par pages</option><option value="l" ${it.mode==='l'?'selected':''}>Par numéros (exercices, listes…)</option></select></label><label class="f" style="width:130px">${it.mode==='l'?'Nb d\'éléments':'Nb de pages'}<input type="number" id="it-n" min="1" max="2000" value="${it.n}" data-ch="in"></label></div>
+  <div class="row wrapr"><label class="f grow" ${it.qz?'style="display:none"':''}>Suivi<select id="it-mode" data-ch="imode"><option value="p" ${it.mode==='p'?'selected':''}>Par pages</option><option value="l" ${it.mode==='l'?'selected':''}>Par numéros (exercices, listes…)</option></select></label><label class="f" style="width:130px">${it.qz?'Nb de mots':it.mode==='l'?'Nb d\'éléments':'Nb de pages'}<input type="number" id="it-n" min="1" max="2000" value="${it.n}" data-ch="in"></label></div>
   <label class="f">Section<select id="it-cat" data-ch="icat">${c.sections.map(x=>`<option value="${x.id}" ${x.id===it.t?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
   <label class="row small" style="font-weight:600"><input type="checkbox" id="it-skip" data-ch="iskip" ${it.skip?'checked':''} style="width:20px;height:20px;min-height:0;accent-color:var(--ink)"> Ne compte pas dans la progression (corrigé, annexe…)</label>
   <div class="row"><button class="btn danger sm" data-a="delitem">Supprimer</button><button class="btn pri grow" data-a="close">OK</button></div>`;
@@ -771,6 +801,14 @@ function mPick(){
 function mMergeChoice(){return `<h2>Ton compte contient déjà des données</h2><p style="margin:0">Cet appareil a aussi des cours et des sessions. Que veux-tu faire ?</p><button class="btn acc" data-a="mergekeep">Utiliser seulement les données du compte</button><button class="btn" data-a="mergeall">Fusionner avec les données de cet appareil</button><p class="small mute" style="margin:0">Si tu as déjà importé les mêmes cours sur tes deux appareils, choisis la première option pour éviter les doublons.</p>`}
 function mNewPw(){return `<h2>${T.pwRecovery?'Choisis un nouveau mot de passe':'Changer le mot de passe'}</h2><form data-f="newpw" style="display:flex;flex-direction:column;gap:12px"><label class="f">Nouveau mot de passe<input type="password" id="np-1" autocomplete="new-password" minlength="6" required></label><label class="f">Confirme-le<input type="password" id="np-2" autocomplete="new-password" minlength="6" required></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Enregistrer</button></div></form>`}
 function mFeedback(){return `<h2>Ton avis</h2><div class="stars" role="group" aria-label="Note">${[1,2,3,4,5].map(r=>`<button type="button" data-a="star" data-r="${r}" aria-pressed="${T.fb.r>=r}" aria-label="${r} sur 5">★</button>`).join('')}</div><form data-f="fb" style="display:flex;flex-direction:column;gap:12px"><label class="f">Ton message<textarea id="fb-msg" rows="5" maxlength="2000" placeholder="Ce qui te plaît, ce qui manque, un bug…" data-tmp="fbmsg">${esc(T.fbmsg||'')}</textarea></label><div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Envoyer</button></div></form>`}
+function mQzItem(){const c=S.courses[T.qz.c],x=c&&c.sections.find(y=>y.id===T.qz.s);return `<h2>Ajouter un set Quizlet${x?' dans '+esc(x.name):''}</h2><form data-f="qzitem" style="display:flex;flex-direction:column;gap:12px">
+  <label class="f">Lien du set<input type="url" id="qz-url" value="${esc(T.qzurl||'')}" data-tmp="qzurl" placeholder="https://quizlet.com/fr/123456789/…" autocomplete="off" required></label>
+  <div class="row wrapr"><label class="f grow">Titre (facultatif)<input type="text" id="qz-title" value="${esc(T.qztitle||'')}" data-tmp="qztitle" placeholder="Ex. Unit 3 – Vocabulaire" autocomplete="off"></label><label class="f" style="width:130px">Nb de mots<input type="number" id="qz-n" min="1" max="2000" value="${esc(T.qzn||'')}" data-tmp="qzn" placeholder="Ex. 40"></label></div>
+  <label class="f">Mode à l'ouverture<select id="qz-mode">${QZ_MODES.map(m=>`<option value="${m[0]}">${m[1]}</option>`).join('')}</select></label>
+  <p class="small mute" style="margin:0">Le set doit être public. Dans Quizlet : Partager, puis Copier le lien. Le nombre de mots s'affiche en haut du set. Tes scores Quizlet ne remontent pas dans l'app : tu coches toi-même ce que tu maîtrises.</p>
+  <div class="row"><button type="button" class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow">Ajouter</button></div></form>`}
+function openQuizletItem(c,it){const q=it.qz,md=it.qmode||'flashcards';showViewer(it.name,`<iframe src="https://quizlet.com/${q}/${md}/embed" title="${esc(it.name)}" allow="fullscreen"></iframe>`,`<select data-ch="qzmodeitem" data-c="${c.id}" data-i="${it.id}" aria-label="Mode Quizlet" style="width:auto;min-height:34px;padding:4px 8px">${QZ_MODES.map(x=>`<option value="${x[0]}" ${x[0]===md?'selected':''}>${x[1]}</option>`).join('')}</select><a class="btn sm ghost" href="https://quizlet.com/${q}" target="_blank" rel="noopener">Ouvrir sur Quizlet</a>`)}
+async function qzFromFile(f){const e=(f.name.split('.').pop()||'').toLowerCase();if(!['webloc','url','txt'].includes(e)||f.size>200000)return null;try{const t=new TextDecoder('latin1').decode(await f.arrayBuffer());const m=t.match(/https?:\/\/(?:www\.)?quizlet\.com\/[^\s"'<>\x00-\x1f]+/i);return m&&qzId(m[0])?m[0]:null}catch(err){return null}}
 function mRestore(){return `<h2>Restaurer une sauvegarde</h2><p class="small mute" style="margin:0">Colle ici le texte copié avec « Copier une sauvegarde ». Il remplace toutes les données actuelles.</p><textarea id="rs-text" rows="6" aria-label="Sauvegarde"></textarea><div class="row"><button class="btn ghost" data-a="close">Annuler</button><button class="btn pri grow" data-a="dorestore">Restaurer</button></div>`}
 
 /* ---------- actions ---------- */
@@ -820,6 +858,10 @@ const A={
   more(el){const u=snap('main'),d=dayOf();d.extra=d.extra||{};d.extra[el.dataset.c]=(d.extra[el.dataset.c]||0)+1;commit('main');toast('Voilà la suite.',u)},
   item(el){T.ic=el.dataset.c;T.ii=el.dataset.i;T.back=M&&M.fn===mBilan;openModal(mItem);if(T.back)M.back=mBilan;loadDoc(T.ii)},
   opendoc(){openDoc()},
+  days(){T.dper=T.dper||14;openModal(mDays)},
+  dper(el){const n=el.dataset.n;T.dper=n==='all'?'all':+n;refresh()},
+  qzadd(el){T.qz={c:el.dataset.c,s:el.dataset.s};T.qzurl='';T.qztitle='';T.qzn='';openModal(mQzItem)},
+  qzopen(el){const c=S.courses[el.dataset.c],it=c&&c.items.find(i=>i.id===el.dataset.i);if(!it||!it.qz)return;markActive();openQuizletItem(c,it)},
   annexadd(el){T.ax={c:el.dataset.c,type:'quizlet',url:'',title:'',txt:'',mode:'flashcards'};openModal(mAnnex)},
   axtype(el){T.ax.type=el.dataset.t;refresh()},
   annexopen(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;if(a.type==='deck'){T.dk={c:c.id,k:a.id,view:null};openModal(mDeck)}else if(a.type==='quizlet')openQuizlet(c,a);else if(a.type==='video')showViewer(a.title,`<iframe src="https://www.youtube-nocookie.com/embed/${ytId(a.url)}" title="${esc(a.title)}" allow="fullscreen; picture-in-picture; encrypted-media" allowfullscreen></iframe>`,`<a class="btn sm ghost" href="${esc(a.url)}" target="_blank" rel="noopener">Ouvrir sur YouTube</a>`)},
@@ -893,6 +935,7 @@ const C={
   icat(el){const it=curItem();if(it){it.t=el.value;commit('c_'+T.ic)}},
   iskip(el){const it=curItem();if(it){it.skip=el.checked?1:0;commit('c_'+T.ic)}},
   focus(el){S.main.focus=+el.value||0;commit('main')},
+  qzmodeitem(el){const c=S.courses[el.dataset.c],it=c&&c.items.find(i=>i.id===el.dataset.i);if(!it)return;it.qmode=el.value;commit('c_'+c.id);if(!$('#viewer').hidden)openQuizletItem(c,it)},
   qzmode(el){const c=S.courses[el.dataset.c],a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;a.mode=el.value;commit('c_'+c.id);openQuizlet(c,a)},
   dkrev(el){const a=findAnnex(el.dataset.c,el.dataset.k);if(!a)return;a.rev=el.checked?1:0;commit('c_'+el.dataset.c)},
   ckman(el){T.ckMan=el.checked},
@@ -937,6 +980,10 @@ const F={
     else{const cards=parseCards(x.txt);if(!cards.length){toast('Aucune carte reconnue. Mets une carte par ligne : terme, tabulation, définition.');return}a.cards=cards;a.title=a.title||'Flashcards'}
     (c.annexes||(c.annexes=[])).push(a);M=null;commit('c_'+c.id);toast(x.type==='deck'?a.cards.length+' cartes ajoutées.':'Annexe ajoutée.')},
   dkadd(){const a=findAnnex(T.dk.c,T.dk.k);if(!a)return;const cards=parseCards($('#dk-add').value);if(!cards.length){toast('Aucune carte reconnue.');return}const have=new Set(a.cards.map(x=>x.f+'\u0001'+x.b));const nw=cards.filter(x=>!have.has(x.f+'\u0001'+x.b));a.cards.push(...nw);T.dk.view=null;commit('c_'+T.dk.c);toast(nw.length+' carte'+(nw.length>1?'s':'')+' ajoutée'+(nw.length>1?'s':'')+'.')},
+  qzitem(){const c=S.courses[T.qz.c];if(!c)return;const url=(T.qzurl||'').trim(),q=qzId(url);if(!q){toast('Ce lien ne ressemble pas à un set Quizlet.');return}
+    const x=c.sections.find(y=>y.id===T.qz.s)||defaultSec(c);if(c.items.some(i=>i.qz===q&&i.t===x.id)){toast('Ce set est déjà dans cette section.');return}
+    c.items.push(fixItem({id:uid(),t:x.id,name:((T.qztitle||'').trim()||'Set Quizlet').slice(0,160),key:'qz/'+q,n:parseInt(T.qzn)||1,s:'',skip:0,qz:q,url,qmode:$('#qz-mode').value,mode:'l'},'p'));
+    M=null;commit('c_'+c.id);toast('Set Quizlet ajouté.'+((parseInt(T.qzn)||0)>1?'':' Indique son nombre de mots pour suivre ta progression.'))},
   pktxt(){const i=$('#pk-txt'),v=i.value.trim();if(!v)return;T.pk.txt.push({id:uid(),txt:v.slice(0,200),done:0});refresh();const n=$('#pk-txt');if(n)n.focus()}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||el.disabled)return;
@@ -1060,8 +1107,10 @@ async function applyImport(){
         if(!x&&fl.folder){x=matchSec(c,fl.folder);if(!x){x={id:uid(),name:fl.folder.slice(0,60),g:guessG(fl.folder)};c.sections.push(x);touched.add('c_'+c.id)}}
         if(!x)x=defaultSec(c);
         const key=x.id+'/'+fl.rest.join('/');if(c.items.some(i=>i.key===key))continue;
-        const name=fl.rest.join(' / ').replace(/\.[a-z0-9]{1,5}$/i,'');
+        const name=fl.rest.join(' / ').replace(/\.[a-z0-9]{1,6}$/i,'');
         const ref=/corrig|solution|resol|correction|reponse/.test(norm(name));
+        const qzu=await qzFromFile(fl.x.f);
+        if(qzu){c.items.push(fixItem({id:uid(),t:x.id,name:name.slice(0,160),key,n:1,s:'',skip:0,qz:qzId(qzu),url:qzu,qmode:'flashcards',mode:'l'},'p'));nf++;np++;touched.add('c_'+c.id);continue}
         const n=x.g==='p'?1:await countParts(fl.x.f);
         const it=fixItem({id:uid(),t:x.id,name:name.slice(0,160),key,n,s:'',skip:(x.g==='x'||ref)?1:0},x.g);
         c.items.push(it);nf++;if(x.g==='p')np++;touched.add('c_'+c.id);
